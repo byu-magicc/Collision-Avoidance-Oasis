@@ -16,3 +16,6 @@ class TwoDYawState:
         self.ypos = array.item(1)
         self.yaw = array.item(2)
         self.vel = array.item(3)
+    
+    def getPos(self):
+        return np.array([[self.xpos, self.ypos]]).T

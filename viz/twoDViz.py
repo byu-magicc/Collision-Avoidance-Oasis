@@ -4,7 +4,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from collections.abc import Sequence
+from typing import List
 
 class twoDViz:
 
@@ -19,7 +19,7 @@ class twoDViz:
 
 
 
-    def update(self, uav_pos:np.ndarray, target_pos:Sequence[np.ndarray]):
+    def update(self, uav_pos:np.ndarray, target_pos:List[np.ndarray]):
         """
             Updates the visualization with the new UAV and target positions.
         """
@@ -31,3 +31,4 @@ class twoDViz:
             x.append(pos[0])
             y.append(pos[1])
         self._ax.scatter(x,y,c='b')
+        plt.plot()
