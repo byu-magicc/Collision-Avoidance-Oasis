@@ -4,7 +4,6 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
 from msg.twoDYawState import TwoDYawState
 from typing import List
 
@@ -41,5 +40,6 @@ class twoDViz:
         self._ax.set_ylabel("y")
         self._ax.set_xlim(self.limits[0])
         self._ax.set_ylim(self.limits[1])
+        
         self._fig.canvas.draw()
         self._fig.canvas.flush_events()

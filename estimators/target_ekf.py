@@ -9,9 +9,9 @@ from msg.bearing_msg import BearingMsg
 
 class TargetEKF:
     def __init__(self, initial_bearing, initial_yaw, ts) -> None:
-        self.Q = np.diag([0.01, 0.01, 0.01, 0.01,0.01])
+        self.Q = np.diag([0.1, 0.5, 0.1, 0.1, 0.1])
         self.R = np.diag([0.01**2, 0.01**2])
-        self.xhat = np.array([[initial_bearing, 100., 20., 0., initial_yaw]]).T
+        self.xhat = np.array([[initial_bearing, 39., 15., np.pi/2, initial_yaw]]).T
         self.P = np.diag([0.1, 100., 1., 0.5, 0.01])
         self.N = 20
         self.Ts = ts
