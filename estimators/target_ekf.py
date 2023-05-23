@@ -9,7 +9,7 @@ from msg.bearing_msg import BearingMsg
 
 class TargetEKF:
     def __init__(self, initial_bearing, initial_yaw, ts) -> None:
-        self.Q = np.diag([])
+        self.Q = np.diag([0.01, 0.01, 0.01, 0.01,0.01])
         self.R = np.diag([0.01**2, 0.01**2])
         self.xhat = np.array([[initial_bearing, 100., 20., 0., initial_yaw]]).T
         self.P = np.diag([0.1, 100., 1., 0.5, 0.01])
@@ -19,7 +19,7 @@ class TargetEKF:
 
     def update(self, measurement:BearingMsg, state:TwoDYawState, input):
         self.propagate_model(measurement, state, input)
-        self.measurement_update(measurement, state, input)
+        self.measurement_update(measurement, state)
 
     def propagate_model(self, measurement, state, input):
         for i in range(self.N):
