@@ -31,4 +31,4 @@ class twoDViz:
             x.append(pos[0])
             y.append(pos[1])
         self._ax.scatter(x,y,c='b')
-        plt.plot()
+        plt.show()
