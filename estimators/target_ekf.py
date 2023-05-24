@@ -9,10 +9,10 @@ from msg.bearing_msg import BearingMsg
 
 class TargetEKF:
     def __init__(self, initial_bearing, initial_yaw, ts) -> None:
-        self.Q = np.diag([0.1, 0.5, 0.1, 0.1, 0.1])
-        self.R = np.diag([0.01**2, 0.01**2])
-        self.xhat = np.array([[initial_bearing, 39., 15., np.pi/2, initial_yaw]]).T
-        self.P = np.diag([0.1, 100., 1., 0.5, 0.01])
+        self.Q = 0.005*np.diag([0.1, 0.01, 0.01, 0.01, 0.1])
+        self.R = np.diag([0.001**2, 0.01**2])
+        self.xhat = np.array([[initial_bearing, 10., 30., -np.pi, initial_yaw]]).T
+        self.P = np.diag([0.01, 5**2, 5**2, np.pi**2, 0.01])
         self.N = 20
         self.Ts = ts
         self.Tp = ts/self.N
@@ -25,6 +25,8 @@ class TargetEKF:
         for i in range(self.N):
             # propagate model
             self.xhat += self.Tp*self._f(self.xhat, measurement, state, input)
+            self.xhat[3,0]=wrap(self.xhat[3,0])
+            self.xhat[4,0] = wrap(self.xhat[4,0])
             # get values for computing jacobian
             eta = self.xhat.item(0)
             tau = self.xhat.item(1)
@@ -63,5 +65,12 @@ class TargetEKF:
         vo = state.vel 
         psid = input
         # calculate xdot
-        xdot = np.array([[sin(eta)/tau-vi*sin(eta+psi-psii)/(vo*tau)-psid,-cos(eta)+vi/vo*cos(eta+psi-psii), 0., 0., psid]]).T
+        xdot = np.array([[sin(eta)/tau-vi*sin(eta+psi-psii)/(vo*tau)+psid,-cos(eta)+vi/vo*cos(eta+psi-psii), 0., 0., psid]]).T
         return xdot
+    
+def wrap(angle):
+    while angle > np.pi:
+        angle -= 2*np.pi
+    while angle < -np.pi:
+        angle += 2*np.pi
+    return angle

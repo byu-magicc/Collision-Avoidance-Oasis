@@ -10,7 +10,7 @@ from controllers.twodbearingunzeroer import TwoDBearingNonzeroer
 from viz.twoDViz import twoDViz
 from viz.twoDEstimatorViz import TwoDEstimatorViz
 
-limits=[[-500,500],[-20,620]]
+limits=[[-500,500],[-20,1200]]
 viz = twoDViz(limits)
 
 t = 0.
