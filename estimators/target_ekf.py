@@ -65,7 +65,7 @@ class TargetEKF:
         vo = state.vel 
         psid = input
         # calculate xdot
-        xdot = np.array([[sin(eta)/tau-vi*sin(eta+psi-psii)/(vo*tau)+psid,-cos(eta)+vi/vo*cos(eta+psi-psii), 0., 0., psid]]).T
+        xdot = np.array([[sin(eta)/tau-vi*sin(eta+psi-psii)/(vo*tau)-psid,-cos(eta)+vi/vo*cos(eta+psi-psii), 0., 0., psid]]).T
         return xdot
     
 def wrap(angle):

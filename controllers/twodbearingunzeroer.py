@@ -12,7 +12,7 @@ class TwoDBearingNonzeroer:
         self.Ts = Ts
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
-        self.yaw_derivative = DirtyDerivative(Ts, 10*Ts)
+        self.yaw_derivative = DirtyDerivative(Ts, 5*Ts)
         self.bearing_derivatives = []
         for i in range(num_targets):
             bearing_derivative = DirtyDerivative(Ts, 5*Ts)
@@ -30,8 +30,8 @@ class TwoDBearingNonzeroer:
                 indexsmallest = i
         gain = 10e-5
         if smallestbd == 0.0:
-            return self.saturate(gain/(smallestbd-0.001))
-        return self.saturate(gain/smallestbd)
+            return self.saturate(-gain/(smallestbd+0.001))
+        return self.saturate(-gain/smallestbd)
 
     def saturate(self, input):
         if input > self.upper_bound:

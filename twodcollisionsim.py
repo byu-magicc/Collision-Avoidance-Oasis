@@ -30,7 +30,7 @@ initial_pos = np.array([[0.,0.]]).T
 uav = ConstantVelocity(ts, initial_pos, initial_yaw, v0)
 
 max_yaw_d = 9.81/v0 * np.tan(max_roll)
-commanded_yaw_rate = max_yaw_d
+commanded_yaw_rate = 0.#max_yaw_d
 
 # create target to that will collide with the uav
 tc = 30.
@@ -63,7 +63,7 @@ while t < tend:
     else:
         target_estimator = TargetEKF(measurements[0].bearing,uav.true_state.yaw, ts)
 
-    #commanded_yaw_rate = controller.update(measurements)
+    commanded_yaw_rate = controller.update(measurements)
 
     uav.update(commanded_yaw_rate)
     target.update()
