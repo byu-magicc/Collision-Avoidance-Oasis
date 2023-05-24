@@ -14,6 +14,6 @@ class BearingSensor:
         bearings = []
         for target_pos in target_positions:
             dif = target_pos - uav_position
-            bearing = np.arctan2(dif[0], dif[1])
+            bearing = np.arctan2(dif[0], dif[1])-uav_yaw
             bearings.append(BearingMsg(bearing.item(0), uav_yaw))
         return bearings

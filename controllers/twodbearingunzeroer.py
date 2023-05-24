@@ -12,7 +12,7 @@ class TwoDBearingNonzeroer:
         self.Ts = Ts
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
-        self.yaw_derivative = DirtyDerivative(Ts, 5*Ts)
+        self.yaw_derivative = DirtyDerivative(Ts, 10*Ts)
         self.bearing_derivatives = []
         for i in range(num_targets):
             bearing_derivative = DirtyDerivative(Ts, 5*Ts)
@@ -24,7 +24,7 @@ class TwoDBearingNonzeroer:
         smallestbd = float('inf')
         indexsmallest = -1
         for i, measurement in enumerate(measurements):
-            bd = self.bearing_derivatives[i].update(measurement.bearing) + yawd
+            bd = self.bearing_derivatives[i].update(measurement.bearing)# + yawd
             if np.abs(bd) < smallestbd:
                 smallestbd = bd
                 indexsmallest = i

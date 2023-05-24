@@ -9,6 +9,7 @@ from sensors.bearingSensor import BearingSensor
 from controllers.twodbearingunzeroer import TwoDBearingNonzeroer
 from viz.twoDViz import twoDViz
 from viz.twoDEstimatorViz import TwoDEstimatorViz
+from estimators.test_estimator_model import TestEstimatorModel
 
 limits=[[-500,500],[-20,1200]]
 viz = twoDViz(limits)
@@ -24,7 +25,7 @@ tend = 60
 max_roll = 20.*np.pi/180
 
 v0 = 20
-initial_yaw = 0
+initial_yaw = 0.
 initial_pos = np.array([[0.,0.]]).T
 uav = ConstantVelocity(ts, initial_pos, initial_yaw, v0)
 
@@ -42,6 +43,12 @@ estimator_viz = TwoDEstimatorViz(targetvel,targetyaw)
 
 target = ConstantVelocity(ts, np.array([[xi,yi]]).T, targetyaw, targetvel)
 
+#setup the test of the estimator model with the info on the target
+dif = np.array([[xi,yi]]).T - initial_pos
+bearing = np.arctan2(dif.item(0), dif.item(1)) - initial_yaw
+tau0 = np.linalg.norm(dif)/v0
+testmodel = TestEstimatorModel(bearing, tau0, targetvel, targetyaw, initial_yaw, ts)
+
 #setup the sensor
 sensor = BearingSensor()
 target_estimator = None
@@ -56,15 +63,15 @@ while t < tend:
     else:
         target_estimator = TargetEKF(measurements[0].bearing,uav.true_state.yaw, ts)
 
-    commanded_yaw_rate = controller.update(measurements)
+    #commanded_yaw_rate = controller.update(measurements)
 
     uav.update(commanded_yaw_rate)
     target.update()
-
+    testmodel.update(uav.true_state, commanded_yaw_rate)
     
     estimator_viz.update(uav.true_state, target.true_state, target_estimator.xhat, t, measurements[0])
     t += ts
     steps += 1
     if steps % plotsteps == 0:
-        viz.update(uav.true_state, [target.true_state])
+        viz.update(uav.true_state, [target.true_state, testmodel.state])
         estimator_viz.update_plots()
