@@ -9,7 +9,7 @@ from sensors.bearingSensor import BearingSensor
 from controllers.twodbearingunzeroer import TwoDBearingNonzeroer
 from viz.twoDViz import twoDViz
 from viz.twoDEstimatorViz import TwoDEstimatorViz
-from estimators.test_estimator_model import TestEstimatorModel
+from estimators.test_inverse_depth_model import TestInverseDepthModel
 
 limits=[[-500,500],[-20,1200]]
 viz = twoDViz(limits)
@@ -46,8 +46,8 @@ target = ConstantVelocity(ts, np.array([[xi,yi]]).T, targetyaw, targetvel)
 #setup the test of the estimator model with the info on the target
 dif = np.array([[xi,yi]]).T - initial_pos
 bearing = np.arctan2(dif.item(0), dif.item(1)) - initial_yaw
-tau0 = np.linalg.norm(dif)/v0
-testmodel = TestEstimatorModel(bearing, tau0, targetvel, targetyaw, initial_yaw, ts)
+rho0 = 1/np.linalg.norm(dif)
+testmodel = TestInverseDepthModel(bearing, rho0, targetvel, targetyaw, initial_yaw, ts)
 
 #setup the sensor
 sensor = BearingSensor()
