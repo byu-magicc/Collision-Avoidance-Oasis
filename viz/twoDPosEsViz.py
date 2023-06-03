@@ -11,7 +11,7 @@ class TwoDPosEsViz:
         plt.ion()
         self.fig = plt.figure()
         self.x_ax = self.fig.add_subplot(411)
-        self.y_ax = self.fig.add_subplot(414)
+        self.y_ax = self.fig.add_subplot(412)
         self.vel_ax = self.fig.add_subplot(413)
         self.psii_ax = self.fig.add_subplot(414)
         self._t = []

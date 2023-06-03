@@ -11,9 +11,9 @@ class TargetEKF:
     def __init__(self, initial_bearing, initial_yaw, ts) -> None:
         self.Q = 0.005*np.diag([0.1, 0.01, 0.01, 0.01, 0.1])
         self.R = np.diag([0.001**2, 0.01**2])
-        self.xhat = np.array([[initial_bearing, 10., 30., -np.pi, initial_yaw]]).T
+        self.xhat = np.array([[initial_bearing, 39., 15., np.pi/2, initial_yaw]]).T
         self.P = np.diag([0.01, 5**2, 5**2, np.pi**2, 0.01])
-        self.N = 20
+        self.N = 10
         self.Ts = ts
         self.Tp = ts/self.N
 
@@ -25,7 +25,9 @@ class TargetEKF:
         for i in range(self.N):
             # propagate model
             self.xhat += self.Tp*self._f(self.xhat, measurement, state, input)
-            self.xhat[3,0]=wrap(self.xhat[3,0])
+            self.xhat[1,0] = saturate(self.xhat[1,0], 0.01, 100000)
+            self.xhat[2,0] = saturate(self.xhat[2,0], 0., 1000.)
+            self.xhat[3,0] = wrap(self.xhat[3,0])
             self.xhat[4,0] = wrap(self.xhat[4,0])
             # get values for computing jacobian
             eta = self.xhat.item(0)
@@ -54,6 +56,9 @@ class TargetEKF:
         L = self.P @ C.T @ S_inv
         self.P = (np.identity(5) - L @ C) @ self.P @ (np.identity(5)-L @ C).T + L @ self.R @ L.T
         self.xhat += L @ (y-h)
+        self.xhat[1,0] = saturate(self.xhat[1,0], 0.01, 100000)
+        self.xhat[2,0] = saturate(self.xhat[2,0], 0., 1000.)
+        self.xhat[3,0] = wrap(self.xhat[3,0])
 
     def _f(self, x, measurement, state, input):
         # get values needed for the calculation
@@ -74,3 +79,5 @@ def wrap(angle):
     while angle < -np.pi:
         angle += 2*np.pi
     return angle
+def saturate(value, minimum, maximum):
+    return min(maximum, max(value, minimum))

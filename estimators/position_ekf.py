@@ -7,24 +7,24 @@ from numpy import sin, cos
 from msg.twoDYawState import TwoDYawState
 from msg.bearing_msg import BearingMsg
 
-class TargetEKF:
+class PositionEKF:
     def __init__(self, ts) -> None:
         self.Q = 0.707*np.diag([0.001, 0.001, 0.01, 0.001])
         self.R = np.diag([0.001**2])
         self.xhat = np.array([[0., 0., 30., 0.]]).T
         self.P = np.diag([10**2, 10**2, 5**2, np.pi**2])
-        self.N = 20
+        self.N = 10
         self.Ts = ts
         self.Tp = ts/self.N
 
-    def update(self, measurement:BearingMsg, state:TwoDYawState, input):
-        self.propagate_model(measurement, state, input)
+    def update(self, measurement:BearingMsg, state:TwoDYawState):
+        self.propagate_model(measurement, state)
         self.measurement_update(measurement, state)
 
-    def propagate_model(self, measurement, state, input):
+    def propagate_model(self, measurement, state):
         for i in range(self.N):
             # propagate model
-            self.xhat += self.Tp*self._f(self.xhat, measurement, state, input)
+            self.xhat += self.Tp*self._f(self.xhat, measurement, state)
             self.xhat[3,0]=wrap(self.xhat[3,0])
             # get values for computing jacobian
             uavpos = state.getPos()
@@ -52,10 +52,12 @@ class TargetEKF:
         y = np.array([[measurement.bearing]])
         S_inv = np.linalg.inv(self.R + C @ self.P @ C.T)
         L = self.P @ C.T @ S_inv
-        self.P = (np.identity(5) - L @ C) @ self.P @ (np.identity(4)-L @ C).T + L @ self.R @ L.T
+        self.P = (np.identity(4) - L @ C) @ self.P @ (np.identity(4)-L @ C).T + L @ self.R @ L.T
         self.xhat += L @ (y-h)
+        self.xhat[3,0] = wrap(self.xhat[3,0])
+        self.xhat[2,0] = saturate(self.xhat[2,0], 0, 750)
 
-    def _f(self, x, measurement, state, input):
+    def _f(self, x, measurement, state):
         # get values needed for the calculation
         vi = self.xhat.item(2)
         psii = self.xhat.item(3)
@@ -69,3 +71,5 @@ def wrap(angle):
     while angle < -np.pi:
         angle += 2*np.pi
     return angle
+def saturate(value, minimum, maximum):
+    return min(maximum, max(value, minimum))

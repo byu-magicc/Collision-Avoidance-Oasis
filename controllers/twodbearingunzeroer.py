@@ -28,7 +28,7 @@ class TwoDBearingNonzeroer:
             if np.abs(bd) < smallestbd:
                 smallestbd = bd
                 indexsmallest = i
-        gain = 10e-5
+        gain = 10e-4
         if smallestbd == 0.0:
             return self.saturate(-gain/(smallestbd+0.001))
         return self.saturate(-gain/smallestbd)
