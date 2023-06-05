@@ -4,11 +4,11 @@
 
 import numpy as np
 from dynamics.constantVelocity import ConstantVelocity
-from estimators.target_ekf import TargetEKF
+from estimators.inverse_depth_ekf import InverseDepthEKF
 from sensors.bearingSensor import BearingSensor
 from controllers.twodbearingunzeroer import TwoDBearingNonzeroer
 from viz.twoDViz import twoDViz
-from viz.twoDEstimatorViz import TwoDEstimatorViz
+from viz.inverseDEstimatorViz import InverseDEstimatorViz
 from estimators.test_inverse_depth_model import TestInverseDepthModel
 
 limits=[[-500,500],[-20,1200]]
@@ -39,7 +39,7 @@ targetyaw = np.pi/2
 xi = initial_pos.item(0)+tc*v0*np.sin(initial_yaw)-tc*targetvel*np.sin(targetyaw)+50
 yi = initial_pos.item(1)+tc*v0*np.cos(initial_yaw)-tc*targetvel*np.cos(targetyaw)
 
-estimator_viz = TwoDEstimatorViz(targetvel,targetyaw)
+estimator_viz = InverseDEstimatorViz(targetvel,targetyaw)
 
 target = ConstantVelocity(ts, np.array([[xi,yi]]).T, targetyaw, targetvel)
 
@@ -61,7 +61,7 @@ while t < tend:
     if target_estimator is not None:
         target_estimator.update(measurements[0],uav.true_state,commanded_yaw_rate)
     else:
-        target_estimator = TargetEKF(measurements[0].bearing,uav.true_state.yaw, ts)
+        target_estimator = InverseDepthEKF(measurements[0].bearing,uav.true_state.yaw, ts)
 
     # commanded_yaw_rate = controller.update(measurements)
 

@@ -9,9 +9,9 @@ from msg.bearing_msg import BearingMsg
 
 class InverseDepthEKF:
     def __init__(self, initial_bearing, initial_yaw, ts) -> None:
-        self.Q = 0.005*np.diag([0.1, 0.01, 0.01, 0.01, 0.1])
+        self.Q = 0.005*np.diag([0.1, 1., 0.1, 0.0001, 0.1])
         self.R = np.diag([0.001**2, 0.01**2])
-        self.xhat = np.array([[initial_bearing, 1/(20*39.), 15., np.pi/2, initial_yaw]]).T
+        self.xhat = np.array([[initial_bearing, 1/(100*20), 20., np.pi/2., initial_yaw]]).T
         self.P = np.diag([0.01, 5**2, 5**2, np.pi**2, 0.01])
         self.N = 10
         self.Ts = ts
