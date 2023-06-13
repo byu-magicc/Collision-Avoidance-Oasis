@@ -5,11 +5,14 @@
 import numpy as np
 from dynamics.constantVelocity import ConstantVelocity
 from estimators.ttc_particle_filter import TTCParticleFilter
+from estimators.inverse_depth_particle_filter import InverseDepthParticleFilter
 from sensors.bearingSensor import BearingSensor
 from controllers.twodbearingunzeroer import TwoDBearingNonzeroer
 from viz.twoDVizWithParticles import twoDVizWithParticles
 
-limits=[[-500,500],[-100,1200]]
+USE_INVERSE = False
+
+limits=[[-1000,500],[-100,1500]]
 viz = twoDVizWithParticles(limits)
 
 t = 0.
@@ -28,7 +31,7 @@ initial_pos = np.array([[0.,0.]]).T
 uav = ConstantVelocity(ts, initial_pos, initial_yaw, v0)
 
 max_yaw_d = 9.81/v0 * np.tan(max_roll)
-commanded_yaw_rate = 0.01#-max_yaw_d
+commanded_yaw_rate = -0.05#-max_yaw_d
 
 # create target to that will collide with the uav
 tc = 30.
@@ -45,13 +48,18 @@ target_estimator = None
 
 #setup the controller
 # controller = TwoDBearingNonzeroer(ts, 1, -max_yaw_d, max_yaw_d)
+measurements = sensor.update(uav.true_state.getPos(), uav.true_state.yaw, [target.true_state.getPos()])
+if USE_INVERSE:
+    target_estimator = InverseDepthParticleFilter(measurements[0].bearing, measurements[0].yaw, ts)
+else:
+    target_estimator = TTCParticleFilter(measurements[0].bearing, measurements[0].yaw, ts)
 
 while t < tend:
     measurements = sensor.update(uav.true_state.getPos(), uav.true_state.yaw, [target.true_state.getPos()])
-    if target_estimator is not None:
-        target_estimator.update(measurements[0],uav.true_state,commanded_yaw_rate)
-    else:
-        target_estimator = TTCParticleFilter(measurements[0].bearing, measurements[0].yaw, ts)
+
+    target_estimator.propagate_model(uav.true_state, commanded_yaw_rate)
+    target_estimator.measurement_update(measurements[0])
+    target_estimator.resample(measurements[0])
 
     # commanded_yaw_rate = controller.update(measurements)
 

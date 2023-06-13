@@ -8,8 +8,8 @@ from msg.twoDYawState import TwoDYawState
 from msg.bearing_msg import BearingMsg
 
 class Particle:
-    def __init__(self, eta, tau, vi, yawi, yawo, ts) -> None:
-        self.xhat = np.array([[eta, tau, vi, yawi, yawo]]).T
+    def __init__(self, eta, rho, vi, yawi, yawo, ts) -> None:
+        self.xhat = np.array([[eta, rho, vi, yawi, yawo]]).T
         self.ts = ts
         self.weight = 1
 
@@ -25,44 +25,44 @@ class Particle:
     def _f(self, x, state, input):
         # get values needed for the calculation
         eta = x.item(0)
-        tau = x.item(1)
+        rho = x.item(1)
         vi = x.item(2)
         psii = x.item(3)
         psi = x.item(4)
         vo = state.vel 
         psid = input
         # calculate xdot
-        xdot = np.array([[sin(eta)/tau-vi*sin(eta+psi-psii)/(vo*tau)-psid,-cos(eta)+vi/vo*cos(eta+psi-psii), 0., 0., psid]]).T
+        xdot = np.array([[vo*rho*sin(eta)-vi*rho*sin(eta+psi-psii)-psid, (vo*cos(eta)-vi*cos(eta+psi-psii))*rho**2, 0., 0., psid]]).T
         return xdot
     
     def get_state(self, uav_state:TwoDYawState):
         theta = self.xhat.item(4)+self.xhat.item(0)
-        vo = uav_state.vel
-        d = self.xhat.item(1)*vo
+        d = 1/self.xhat.item(1)
         xpos = d*np.sin(theta) + uav_state.getPos().item(0)
         ypos = d*np.cos(theta) + uav_state.getPos().item(1)
+
         state = TwoDYawState(xpos, ypos, self.xhat.item(3),self.xhat.item(2))
         state.weight = self.weight
         return state
 
-class TTCParticleFilter:
+class InverseDepthParticleFilter:
     def __init__(self, initial_bearing, initial_yaw, ts) -> None:
         self.ts = ts
-        self.num_particles = 1000
+        self.num_particles = 500
         self.particles = []
         self.bearing_std = 0.01
         self.yaw_std = 0.01
         self.Rinv = np.diag([1/self.bearing_std**2, 1/self.yaw_std**2])
-        self.tau_resample_std = 0.5
+        self.rho_resample_std = 0.001
         self.vi_resample_std = 0.5
         self.yaw_resample_std = 0.1
-        tau_min = 5
-        tau_max = 100
+        rho_min = 0
+        rho_max = 0.5
         vi_max = 50
         vi_min = 2
         for i in range(self.num_particles):
             particle = Particle(initial_bearing,#np.random.normal(initial_bearing, self.bearing_std),
-                                (tau_max - tau_min)*np.random.rand()+tau_min,
+                                (rho_max - rho_min)*np.random.rand()+rho_min,
                                 (vi_max-vi_min)*np.random.rand()+vi_min,
                                 2*np.pi*np.random.rand(),
                                 initial_yaw,#np.random.normal(initial_yaw, self.yaw_std), 
@@ -109,11 +109,11 @@ class TTCParticleFilter:
             while rand[i] > norm_weights[j]:
                 j += 1
             old_particle = old_particles[j]
-            particle = Particle(np.random.normal(old_particle.xhat.item(0), self.bearing_std),#measurement.bearing,#
-                                np.random.normal(old_particle.xhat.item(1), self.tau_resample_std),
+            particle = Particle(measurement.bearing,#np.random.normal(old_particle.xhat.item(0), self.bearing_std),#measurement.bearing,#
+                                np.random.normal(old_particle.xhat.item(1), self.rho_resample_std),
                                 np.random.normal(old_particle.xhat.item(2), self.vi_resample_std),
                                 np.random.normal(old_particle.xhat.item(3), self.yaw_resample_std),
-                                np.random.normal(old_particle.xhat.item(4), self.yaw_std),#measurement.yaw,#
+                                measurement.yaw,#np.random.normal(old_particle.xhat.item(4), self.yaw_std),#measurement.yaw,#
                                 self.ts)
             self.particles.append(particle)
             i += 1

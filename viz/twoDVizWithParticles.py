@@ -24,16 +24,22 @@ class twoDVizWithParticles:
             Updates the visualization with the new UAV and target positions.
         """
         self._ax.clear()
+        self._ax.set_xlim(self.limits[0])
+        self._ax.set_ylim(self.limits[1])
+
         uav_pos = np.reshape(uav_state.getPos(),(2))
         x = []
         y = []
+        sizes = []
+        alpha = 2
         for particle in particle_states:
             pos = np.reshape(particle.getPos(),(2))
             x.append(pos[0])
             y.append(pos[1])
+            sizes.append(particle.weight*alpha)
 
         # plot the particle positions
-        self._ax.scatter(x,y,c='b',s=3)
+        self._ax.scatter(x,y,c='b',s=sizes)
 
         # plot the target's actual position and velocity arrow
         pos = np.reshape(target_state.getPos(),(2))
@@ -48,8 +54,6 @@ class twoDVizWithParticles:
         self._ax.set_title("UAV and Targets")
         self._ax.set_xlabel("x")
         self._ax.set_ylabel("y")
-        self._ax.set_xlim(self.limits[0])
-        self._ax.set_ylim(self.limits[1])
         
         self._fig.canvas.draw()
         self._fig.canvas.flush_events()
