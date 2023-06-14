@@ -49,7 +49,6 @@ class TTCParticleFilter:
     def __init__(self, initial_bearing, initial_yaw, ts) -> None:
         self.ts = ts
         self.num_particles = 1000
-        self.particles = []
         self.bearing_std = 0.01
         self.yaw_std = 0.01
         self.Rinv = np.diag([1/self.bearing_std**2, 1/self.yaw_std**2])
@@ -60,14 +59,14 @@ class TTCParticleFilter:
         tau_max = 100
         vi_max = 50
         vi_min = 2
+        self.xhats = np.zeros((5, self.num_particles))
         for i in range(self.num_particles):
-            particle = Particle(initial_bearing,#np.random.normal(initial_bearing, self.bearing_std),
+            self.xhats[:,i] = np.array([[initial_bearing,#np.random.normal(initial_bearing, self.bearing_std),
                                 (tau_max - tau_min)*np.random.rand()+tau_min,
                                 (vi_max-vi_min)*np.random.rand()+vi_min,
                                 2*np.pi*np.random.rand(),
-                                initial_yaw,#np.random.normal(initial_yaw, self.yaw_std), 
-                                ts)
-            self.particles.append(particle)
+                                initial_yaw,#np.random.normal(initial_yaw, self.yaw_std)
+                                ]])
 
     def update(self, measurement:BearingMsg, state:TwoDYawState, input:float):
         self.propagate_model(state, input)
@@ -75,8 +74,17 @@ class TTCParticleFilter:
         # self.resample(measurement)
 
     def propagate_model(self, state:TwoDYawState, input:float):
-        for particle in self.particles:
-            particle.update(state, input)
+        for i in range(self.num_particles):
+            self.xhats[:,i] = self.update_particle(self.xhats[:,i], state, input)
+
+    def update_particle(self, xhat, state:TwoDYawState, input):
+        x1 = self._f(xhat, state, input)
+        x2 = self._f(xhat + self.ts/2.*x1, state, input)
+        x3 = self._f(xhat + self.ts/2*x2, state, input)
+        x4 = self._f(xhat + self.ts*x3, state, input)
+
+        xhat += self.ts/6.*(x1+2*x2+2*x3+x4) #TODO: add noise
+        return xhat
     
     def measurement_update(self, measurement:BearingMsg):
         for particle in self.particles:
@@ -117,6 +125,19 @@ class TTCParticleFilter:
                                 self.ts)
             self.particles.append(particle)
             i += 1
+
+    def _f(self, x, state, input):
+        # get values needed for the calculation
+        eta = x.item(0)
+        tau = x.item(1)
+        vi = x.item(2)
+        psii = x.item(3)
+        psi = x.item(4)
+        vo = state.vel 
+        psid = input
+        # calculate xdot
+        xdot = np.array([[sin(eta)/tau-vi*sin(eta+psi-psii)/(vo*tau)-psid,-cos(eta)+vi/vo*cos(eta+psi-psii), 0., 0., psid]]).T
+        return xdot
 
     def get_particle_states(self, uav_state:TwoDYawState):
         states = []
