@@ -13,7 +13,7 @@ from viz.twoDEstimatorViz import TwoDEstimatorViz
 from viz.inverseDEstimatorViz import InverseDEstimatorViz
 from estimators.test_inverse_depth_model import TestInverseDepthModel
 
-USE_INVERSE = True
+USE_INVERSE = False
 
 limits=[[-500,500],[-100,1200]]
 viz = twoDViz(limits)
@@ -34,7 +34,7 @@ initial_pos = np.array([[0.,0.]]).T
 uav = ConstantVelocity(ts, initial_pos, initial_yaw, v0)
 
 max_yaw_d = 9.81/v0 * np.tan(max_roll)
-commanded_yaw_rate = 0.01#-max_yaw_d
+commanded_yaw_rate = -0.01#-max_yaw_d
 
 # create target to that will collide with the uav
 tc = 30.
