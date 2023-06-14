@@ -68,4 +68,4 @@ while t < tend:
     t += ts
     steps += 1
     if steps % plotsteps == 0:
-        viz.update(uav.true_state, target.true_state, target_estimator.get_particle_states(uav.true_state))
+        viz.update(uav.true_state, target.true_state, target_estimator.get_particle_states(uav.true_state), t)

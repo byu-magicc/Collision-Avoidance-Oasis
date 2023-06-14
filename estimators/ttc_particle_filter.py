@@ -52,20 +52,21 @@ class TTCParticleFilter:
         self.particles = []
         self.bearing_std = 0.01
         self.yaw_std = 0.01
-        self.Rinv = np.diag([1/self.bearing_std**2, 1/self.yaw_std**2])
         self.tau_resample_std = 0.5
         self.vi_resample_std = 0.5
         self.yaw_resample_std = 0.1
+        self.Rinv = np.diag([1/self.bearing_std**2, 1/self.yaw_std**2])
+        self.Qinv = np.diag([1/self.bearing_std**2, 1/self.tau_resample_std**2, 1/self.vi_resample_std**2, 1/self.yaw_resample_std**2, 1/self.tau_resample_std**2])
         tau_min = 5
         tau_max = 100
         vi_max = 50
         vi_min = 2
         for i in range(self.num_particles):
-            particle = Particle(initial_bearing,#np.random.normal(initial_bearing, self.bearing_std),
+            particle = Particle(np.random.normal(initial_bearing, self.bearing_std),#initial_bearing,#
                                 (tau_max - tau_min)*np.random.rand()+tau_min,
                                 (vi_max-vi_min)*np.random.rand()+vi_min,
                                 2*np.pi*np.random.rand(),
-                                initial_yaw,#np.random.normal(initial_yaw, self.yaw_std), 
+                                np.random.normal(initial_yaw, self.yaw_std), #initial_yaw,#
                                 ts)
             self.particles.append(particle)
 
@@ -82,7 +83,7 @@ class TTCParticleFilter:
         for particle in self.particles:
             y = np.array([[measurement.bearing, measurement.yaw]]).T
             h = np.array([[particle.xhat.item(0), particle.xhat.item(4)]]).T
-            particle.weight = np.exp(-1/2. * (y-h).T @ self.Rinv @ (y-h)).item(0)
+            particle.weight *= np.exp(-1/2. * (y-h).T @ self.Rinv @ (y-h)).item(0)
 
 
     def resample(self, measurement:BearingMsg):
@@ -115,6 +116,7 @@ class TTCParticleFilter:
                                 np.random.normal(old_particle.xhat.item(3), self.yaw_resample_std),
                                 np.random.normal(old_particle.xhat.item(4), self.yaw_std),#measurement.yaw,#
                                 self.ts)
+            # particle.weight = np.exp(-1/2*(particle.xhat - old_particle.xhat).T @ self.Qinv @ (particle.xhat - old_particle.xhat)).item(0)
             self.particles.append(particle)
             i += 1
 

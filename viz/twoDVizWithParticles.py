@@ -19,7 +19,7 @@ class twoDVizWithParticles:
         self._ax = self._fig.add_subplot(111)
 
 
-    def update(self, uav_state:TwoDYawState, target_state:TwoDYawState, particle_states:List[TwoDYawState]):
+    def update(self, uav_state:TwoDYawState, target_state:TwoDYawState, particle_states:List[TwoDYawState], t):
         """
             Updates the visualization with the new UAV and target positions.
         """
@@ -51,7 +51,7 @@ class twoDVizWithParticles:
         self._ax.arrow(uav_pos[0], uav_pos[1], uav_state.vel*np.sin(uav_state.yaw), uav_state.vel*np.cos(uav_state.yaw), color='g')
 
         # make the plot look pretty
-        self._ax.set_title("UAV and Targets")
+        self._ax.set_title(f"UAV and Targets ({t:.2f}s)")
         self._ax.set_xlabel("x")
         self._ax.set_ylabel("y")
         
