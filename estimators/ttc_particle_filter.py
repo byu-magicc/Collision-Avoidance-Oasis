@@ -81,6 +81,8 @@ class TTCParticleFilter:
                 i += 1
                 cc += old_weights[i]
             self.xhats[:,mm] = old_particles[:,i]# + np.array([0., np.random.normal(0, self.tau_res_std), np.random.normal(0,self.vi_res_std), np.random.normal(0,self.yaw_res_std), 0.])
+            self.xhats[0,mm] = measurement.bearing
+            self.xhats[4,mm] = measurement.yaw
             self.weights[mm] = 1#old_weights[i]
 
         # renormalize after sampling
