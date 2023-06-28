@@ -39,9 +39,11 @@ class TwoDEstimatorViz:
 
     def update_plots(self):
         self._tau_ax.clear()
-        self._tau_ax.plot(self._t, self.es_tau, c='b')
-        self._tau_ax.plot(self._t, self.ac_tau, c='r')
+        self._tau_ax.plot(self._t, self.es_tau, label="Estimated", c='b')
+        self._tau_ax.plot(self._t, self.ac_tau, label="Actual", c='r')
+        self._tau_ax.legend()
         self._tau_ax.set_ylabel("Tau")
+        self._tau_ax.set_title("TTC EKF")
 
         self._vel_ax.clear()
         self._vel_ax.plot(self._t, self.es_vel, c='b')

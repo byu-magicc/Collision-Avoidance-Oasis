@@ -39,9 +39,11 @@ class InverseDEstimatorViz:
 
     def update_plots(self):
         self._rho_ax.clear()
-        self._rho_ax.plot(self._t, self.es_rho, c='b')
-        self._rho_ax.plot(self._t, self.ac_rho, c='r')
+        self._rho_ax.plot(self._t, self.es_rho, label="Estimated", c='b')
+        self._rho_ax.plot(self._t, self.ac_rho, label="Actual", c='r')
         self._rho_ax.set_ylabel("Rho")
+        self._rho_ax.legend()
+        self._rho_ax.set_title("Inverse Depth EKF")
 
         self._vel_ax.clear()
         self._vel_ax.plot(self._t, self.es_vel, c='b')

@@ -38,13 +38,13 @@ class twoDVizWithParticles:
             y.append(pos[1])
             sizes.append(particle.weight*alpha)
 
-        # plot the particle positions
-        self._ax.scatter(x,y,c='b',s=sizes)
-
         # plot the target's actual position and velocity arrow
         pos = np.reshape(target_state.getPos(),(2))
         self._ax.arrow(pos[0], pos[1], target_state.vel*np.sin(target_state.yaw),target_state.vel*np.cos(target_state.yaw),color='r')
         self._ax.scatter(pos[0],pos[1],c='r')
+
+        # plot the particle positions
+        self._ax.scatter(x,y,c='b',s=sizes)
 
         #plot the UAV's position and velocity arrow
         self._ax.scatter(uav_pos[0],uav_pos[1],c='g')
