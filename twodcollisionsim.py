@@ -39,8 +39,8 @@ commanded_yaw_rate = 0.01#-max_yaw_d
 # create target to that will collide with the uav
 tc = 30.
 targetvel = 15
-targetyaw = np.pi/2
-xi = initial_pos.item(0)+tc*v0*np.sin(initial_yaw)-tc*targetvel*np.sin(targetyaw)+50
+targetyaw = -np.pi
+xi = initial_pos.item(0)+tc*v0*np.sin(initial_yaw)-tc*targetvel*np.sin(targetyaw)#+50
 yi = initial_pos.item(1)+tc*v0*np.cos(initial_yaw)-tc*targetvel*np.cos(targetyaw)
 
 if (USE_INVERSE):

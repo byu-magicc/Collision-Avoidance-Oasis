@@ -19,3 +19,6 @@ class TwoDYawState:
     
     def getPos(self):
         return np.array([[self.xpos, self.ypos]]).T
+    
+    def toCartesianArray(self):
+        return np.array([[self.xpos, self.ypos, self.vel*np.sin(self.yaw), self.vel*np.cos(self.yaw)]]).T
