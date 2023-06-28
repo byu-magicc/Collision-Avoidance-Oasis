@@ -7,7 +7,12 @@ import numpy as np
 class PseudoLinearKF:
     def __init__(self, ts, xi, first_measurement) -> None:
         self.P = np.diag([5**2, 5**2, 5**2, 5**2])
-        self.xhat = np.array([[100*first_measurement.item(0), 100.*first_measurement.item(1), 10., 10.]]).T
+        range_guess = 300. #guess of range to target
+        velocity_guess = 5. # guess of relative velocity of target, that it is approaching us
+        self.xhat = np.array([[range_guess*first_measurement.item(0), 
+                               range_guess*first_measurement.item(1), 
+                               -velocity_guess*first_measurement.item(0), 
+                               -velocity_guess*first_measurement.item(1)]]).T
         self.A = np.eye(4)
         self.A[0:2, 2:] = ts * np.eye(2)
         self.B = np.zeros((4, 2))

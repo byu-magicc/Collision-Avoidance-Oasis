@@ -20,7 +20,7 @@ ts = 0.01
 steps = 0
 plotsteps = 10
 
-tend = 60
+tend = 80
 
 max_roll = 20.*np.pi/180
 
@@ -28,9 +28,6 @@ v0 = 20
 initial_yaw = 0.
 initial_pos = np.array([[0.,0.]]).T
 uav = ConstantVelocity(ts, initial_pos, initial_yaw, v0)
-x_initial = np.zeros((4,1))
-x_initial[0:2] = initial_pos
-x_initial[2:] = v0 * np.array([[np.sin(initial_yaw),np.cos(initial_yaw)]]).T
 
 max_yaw_d = 9.81/v0 * np.tan(max_roll)
 commanded_yaw_rate = -max_yaw_d
@@ -62,11 +59,11 @@ target_estimator = None
 while t < tend:
     measurements = sensor.update(uav.true_state.getPos(), [target.true_state.getPos()])
     if target_estimator is None:
-        target_estimator = PseudoLinearKF(ts, x_initial, measurements[0])
+        target_estimator = PseudoLinearKF(ts, uav.true_state.toCartesianArray(), measurements[0])
     else:
         target_estimator.update(uav.true_state.toCartesianArray(),measurements[0])
 
-    commanded_yaw_rate = -np.cos(2*np.pi/5.*t)*max_yaw_d#controller.update(measurements)
+    commanded_yaw_rate = 0#-max_yaw_d# np.cos(2*np.pi/5.*t)* controller.update(measurements)
 
     uav.update(commanded_yaw_rate)
     target.update()
