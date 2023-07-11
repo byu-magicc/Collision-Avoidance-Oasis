@@ -1,6 +1,6 @@
 """
 constantVelocity
-    - This file implements the dynamic equations of motion for an object moving at constant velocity in the 2D plane
+    - This file implements the dynamic equations of motion for an object moving at constant velocity
 """
 import numpy as np
 from copy import deepcopy

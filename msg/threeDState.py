@@ -22,4 +22,4 @@ class ThreeDState:
         self.zvel = array.item(5)
     
     def getPos(self):
-        return np.array([[self.xpos, self.ypos, self.zvel]]).T
+        return np.array([[self.xpos, self.ypos, self.zpos]]).T

@@ -17,6 +17,7 @@ class ThreeDViz:
         self.limits=limits
         self._fig = plt.figure()
         self._ax = self._fig.add_subplot(projection="3d")
+        self._ax.view_init(elev=0, azim=180)
 
 
     def update(self, uav_state:ThreeDState, target_states:List[ThreeDState]):
@@ -27,7 +28,7 @@ class ThreeDViz:
         uav_pos = np.reshape(uav_state.getPos(),(3))
         uav_vel = np.reshape(uav_state.toArray()[3:],(3))
         self._ax.scatter(uav_pos[0],uav_pos[1], zs=uav_pos[2], zdir='z',c='r')
-        self._ax.quiver([uav_pos[0]], [uav_pos[1]], [uav_pos[2]], [uav_pos[0]+uav_vel[0]], [uav_pos[1]+uav_vel[1]], [uav_pos[2]+uav_vel[2]], colors='r')
+        # self._ax.quiver([uav_pos[0]], [uav_pos[1]], [uav_pos[2]], [uav_pos[0]+uav_vel[0]], [uav_pos[1]+uav_vel[1]], [uav_pos[2]+uav_vel[2]], colors='r')
         x = []
         y = []
         z = []
@@ -37,7 +38,7 @@ class ThreeDViz:
             x.append(pos[0])
             y.append(pos[1])
             z.append(pos[2])
-            self._ax.quiver([pos[0]], [pos[1]], [pos[2]], [pos[0]+vel[0]], [pos[1]+vel[1]], [pos[2]+vel[2]],colors='b')
+            # self._ax.quiver([pos[0]], [pos[1]], [pos[2]], [pos[0]+vel[0]], [pos[1]+vel[1]], [pos[2]+vel[2]],colors='b')
         self._ax.scatter(x,y, zs=z, zdir='z',c='b')
         self._ax.set_title("UAV and Targets")
         self._ax.set_xlabel("x")
@@ -45,6 +46,7 @@ class ThreeDViz:
         self._ax.set_zlabel("z")
         self._ax.set_xlim(self.limits[0])
         self._ax.set_ylim(self.limits[1])
+        self._ax.set_zlim(self.limits[2])
         
         self._fig.canvas.draw()
         self._fig.canvas.flush_events()

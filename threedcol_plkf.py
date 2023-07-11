@@ -8,7 +8,7 @@ from viz.plkfViz3D import PLKFViz
 
 USE_INVERSE = True
 
-limits=[[-500,500],[-100,1200]]
+limits=[[-100,1100],[-16,16], [-16,16]]
 viz = ThreeDViz(limits)
 
 t = 0.
@@ -19,9 +19,12 @@ plotsteps = 10
 
 tend = 80
 
+radius = 10.
+omega = 1.
+
 v0 = np.array([[20, 0., 0.]]).T
 initial_pos = np.array([[0.,0.,0.]]).T
-uav = ConstantVelocity(ts, initial_pos, v0)
+uav = ConstantVelocity(ts, initial_pos + np.array([[0., radius, 0.]]).T, v0+np.array([[0., 0., radius*omega]]).T)
 
 # create target to that will collide with the uav
 tc = 30.
@@ -37,7 +40,7 @@ sensor = UnitVectorSensor()
 target_estimator = None
 
 #setup the controller
-controller = HelicalNavigationLaw(ts)
+controller = HelicalNavigationLaw(ts, radius, omega)
 
 while t < tend:
     measurements = sensor.update(uav.true_state.getPos(), [target.true_state.getPos()])
