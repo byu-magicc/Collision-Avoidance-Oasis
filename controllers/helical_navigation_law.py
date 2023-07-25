@@ -29,7 +29,7 @@ class HelicalNavigationLaw:
         # Ry = euler_to_rotation(theta=self.c_y*np.cos(self.t))
 
         # des_accel = hat(hat(self.N * vel) @ R_eta@Rz@Ry@ex) @ desired_direction
-        des_accel = np.array([[0., -self.radius* self.omega**2 *np.cos(self.t), -self.radius* self.omega**2 *np.sin(self.t)]]).T
+        des_accel = np.array([[0.3*self.omega**2*np.cos(self.omega*self.t), -self.radius* self.omega**2 *np.cos(self.omega*self.t), -self.radius* self.omega**2 *np.sin(self.omega*self.t)]]).T
 
         self.t += self.Ts
         return des_accel

@@ -6,11 +6,6 @@ from sensors.unitVectorSensor import UnitVectorSensor
 from viz.threeDViz import ThreeDViz
 from viz.plkfViz3D import PLKFViz
 
-USE_INVERSE = True
-
-limits=[[-100,1100],[-16,16], [-16,16]]
-viz = ThreeDViz(limits)
-
 t = 0.
 ts = 0.01
 
@@ -19,8 +14,11 @@ plotsteps = 10
 
 tend = 80
 
-radius = 10.
-omega = 1.
+radius = 20.
+omega = 2*np.pi/5
+
+limits=[[-100,1100],[-(radius+5),radius+5], [-(radius+5),radius+5]]
+viz = ThreeDViz(limits)
 
 v0 = np.array([[20, 0., 0.]]).T
 initial_pos = np.array([[0.,0.,0.]]).T
