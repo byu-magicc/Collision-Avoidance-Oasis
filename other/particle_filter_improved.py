@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 import time
-from scipy.optimize import minimize
+from copy import deepcopy
 
 # define constraints for the optimizer to use later on
 # minimum and maximum ranges of detection
@@ -12,7 +12,7 @@ r_max = 1000
 # maximum predicted velocity
 v_max = 90
 
-desired_measurements = 10
+desired_measurements = 2
 if desired_measurements < 2:
     raise
 
@@ -26,7 +26,7 @@ vi=np.array([[20.,0.]]).T
 # generate LOS vectors from example
 lms = []
 
-ts=0.1
+ts=0.2
 for i in range(desired_measurements):
     lm = pi+vi*i*ts - po-vo*i*ts
     lm /= np.linalg.norm(lm)
@@ -36,7 +36,7 @@ for i in range(desired_measurements):
 ec=vo/np.linalg.norm(vo)
 tau = ((po-pi).T @ ec)/((vi-vo).T @ ec)
 
-def calculate_trajectory(a1, ls, ec, tau):
+def calculate_trajectory_first(a1, ls, ec, tau):
     if len(ls)<2:
         raise
     l1 = ls[0]
@@ -79,112 +79,51 @@ def calculate_trajectory(a1, ls, ec, tau):
     vi = x[-2:]
     return pi0, vi
 
-# def calculate_positions_and_velocities(l1, l2, ec, tau):
+def calculate_trajectory_last(at, ls, t_s, ec, tau):
+    if len(ls)<2:
+        raise
+    lt = ls[-1]
+    ls = ls[0:-1]
+    t = t_s[-1]
+    t_s = t_s[0:-1]
+    # get the unit vector perpendicular to the camera normal vector
+    ecp = np.array([[0, -1],[1,0]]) @ ec
 
-#     # get the unit vector perpendicular to the camera normal vector
-#     ecp = np.array([[0, -1],[1,0]]) @ ec
+    # solve the min-norm problem
+    A=[]
+    for i in range(len(ls)):
+        Ap = []
+        for j in range(i):
+            Ap.append(np.zeros((2,1)))
+        Ap.append(ls[i])
+        for j in range(i+1,len(ls)+1):
+            Ap.append(np.zeros((2,1)))
+        Ap.append(np.eye(2)*(t-t_s[i]))
+        A1 = np.concatenate(Ap,axis=1)
+        A.append(A1)
+    A2 = []
+    for i in range(len(ls)):
+        A2.append(np.zeros((2,1)))
+    A2.append(ecp)
+    A2.append(np.eye(2)*(t-tau))
+    A2 = np.concatenate(A2, axis=1)
+    A.append(A2)
+    A = np.concatenate(A,axis=0)
 
-#     # solve the min-norm problem
-#     A1 = np.concatenate([l1,-l2,np.zeros((2,1)),np.eye(2)*ts],axis=1)
-#     A2 = np.concatenate([l1,np.zeros((2,1)),-ecp,np.eye(2)*tau], axis=1)
-#     A = np.concatenate([A1,A2],axis=0)
+    b = []
+    for i in range(len(ls)):
+        b.append(at*lt+vo*(t-t_s[i]))
+    b.append(at*lt+vo*(t-tau))
+    b = np.concatenate(b,axis=0)
 
-#     b = np.concatenate([vo*ts,vo*tau],axis=0)
+    x = np.linalg.pinv(A)@b
 
-#     x = np.linalg.pinv(A)@b
+    # set the result up as a possible trajectory to plot along 
+    # with the original example
+    pit = at*lt
+    vi = x[-2:]
+    return pit, vi
 
-#     # set the result up as a possible trajectory to plot along 
-#     # with the original example
-#     vi2 = x[3:]
-#     a1 = x.item(0)
-#     pi2 = l1*a1+po
-
-#     # run an optimizer to get the closest and furthest starting 
-#     # points possible while respecting the constraints above
-
-#     # function to minimize alpha
-#     def f_min(x):
-#         return x
-#     # function to maximize alpha
-#     def f_max(x):
-#         return -x
-#     # function for maximum velocity constraint
-#     def max_vel(x):
-#         vel = x*(vi2-vo)+vo
-#         return v_max - np.linalg.norm(vel)
-#     # function for maximum range constraint
-#     r0 = np.linalg.norm((pi2-po))
-#     def max_range(x):
-#         return r_max - x*r0
-#     # function for minimum range constraint
-#     def min_range(x):
-#         return x*r0 - r_min
-
-#     cons = ({'type':'ineq', 'fun':max_vel}, 
-#             {'type':'ineq', 'fun':max_range},
-#             {'type':'ineq', 'fun':min_range})
-
-#     x0=1.
-
-#     # do the optimization to minimize alpha
-#     result = minimize(f_min,x0, constraints=cons)
-#     p_min = result.x.item(0)*(pi2-po)+po
-#     pi2t = result.x.item(0)*((pi2+vi2*tau)-(po+vo*tau))+(po+vo*tau)
-#     vt_min = (pi2t-p_min)/tau
-
-#     # do the optimization to maximize alpha
-#     result = minimize(f_max, x0, constraints=cons)
-#     p_max = result.x.item(0)*(pi2-po)+po
-#     pi2t = result.x.item(0)*((pi2+vi2*tau)-(po+vo*tau))+(po+vo*tau)
-#     vt_max = (pi2t-p_max)/tau
-#     return (p_min, vt_min, p_max,vt_max)
-
-pairs = []
-labels = []
-
-
-
-# res = calculate_positions_and_velocities(l1, l2, ec, tau)
-# pairs.append(res)
-# labels.append("Avg")
-
-# # rerun the calculations for l1 being slightly off
-# l1_minus = l1 / l1.item(1)
-# l1_minus[0,:]-=0.01
-# l1_minus /= np.linalg.norm(l1_minus)
-# print("Angle Difference (minus) (degrees):")
-# print(np.arccos(l1.T @ l1_minus)*180/np.pi)
-# print()
-# res1m = calculate_positions_and_velocities(l1_minus, l2, ec, tau)
-# pairs.append(res1m)
-# labels.append("1 Minus")
-
-# l1_plus = l1/l1.item(1)
-# l1_plus[0,:] += 0.01
-# l1_plus /= np.linalg.norm(l1_plus)
-# print("Angle Difference (plus) (degrees):")
-# print(np.arccos(l1.T@l1_plus)*180/np.pi)
-# print()
-# res1p = calculate_positions_and_velocities(l1_plus, l2, ec, tau)
-# pairs.append(res1p)
-# labels.append("1 Plus")
-
-# # rerun the calculations for l2 being slightly off
-# res2m = calculate_positions_and_velocities(l1, l2-np.array([[0.01, 0.01]]).T, ec, tau)
-# pairs.append(res2m)
-# labels.append("2 Minus")
-
-# res2p = calculate_positions_and_velocities(l1, l2+np.array([[0.01, 0.01]]).T, ec, tau)
-# pairs.append(res2p)
-# labels.append("2 Plus")
-
-# res_taum = calculate_positions_and_velocities(l1, l2, ec, tau-0.1)
-# pairs.append(res_taum)
-# labels.append("Tau Minus")
-
-# res_taup = calculate_positions_and_velocities(l1, l2, ec, tau+0.1)
-# pairs.append(res_taup)
-# labels.append("Tau Plus")
 
 class Trajectories:
     def __init__(self, initial_pos, velocities) -> None:
@@ -231,7 +170,7 @@ class Plotter:
             self.plot_x.append(i_poses[i].item(0))
             self.plot_y.append(i_poses[i].item(1))
 
-        self.ax.scatter(self.plot_x, self.plot_y,s=1)
+        self.ax.scatter(self.plot_x, self.plot_y,s=1, color='g', zorder=-30)
 
         # plot each of the actual intruders
         color_i = 0
@@ -270,7 +209,7 @@ class Plotter:
 
         axamp = plt.axes([0.25, .03, 0.50, 0.02])
         # Slider
-        samp = Slider(axamp, 'Amp', 0, len(self.pox)-1, valinit=initial_i, valstep=1)
+        samp = Slider(axamp, 'Timestep', 0, len(self.pox)-1, valinit=initial_i, valstep=1)
 
         def update(val):
             # amp is the current value of the slider
@@ -286,14 +225,16 @@ class Plotter:
 
         plt.show()
 
-num_particles = 1000
+num_particles = 5000
 lms_norm = []
 for lm in lms:
     lm_norm = lm / lm.item(1)
     lms_norm.append(lm_norm)
-particle_p = [po, pi]
+particle_p = deepcopy([po, pi])
 particle_v = [vo, vi]
 initialc = len(particle_p)
+weights = []
+pi0s = []
 while len(particle_p)-initialc < num_particles:
     # randomly noisify the measurements
     lus = []
@@ -306,17 +247,65 @@ while len(particle_p)-initialc < num_particles:
     tau_u = tau + np.random.normal(0, 0.5)
 
     a1_u = (r_max-r_min)*np.random.random()+ r_min
-    pos, vel = calculate_trajectory(a1_u, lus, ec, tau_u)
+    pos, vel = calculate_trajectory_first(a1_u, lus, ec, tau_u)
     if np.linalg.norm(vel)<=v_max:
         particle_p.append(pos)
+        pi0s.append(pos)
         particle_v.append(vel)
+        weights.append(1)
 
+Rinv = np.diag([1/0.05**2, 1/.05**2])
+
+def update_weights(weights, lm, particle_p, po):
+    for i in range(len(particle_p)):
+        phat = particle_p[i]-po
+        phat /= np.linalg.norm(phat)
+        weights[i] = np.exp(-1/2. * (lm-phat).T @ Rinv @ (lm-phat)).item(0)
+    sum = np.sum(weights)
+    weights = [x/sum for x in weights]
+    return weights
+
+def resample(pi0s, particle_p, particle_v, weights, t):
+    old_pi0s = deepcopy(pi0s)
+    old_weights = deepcopy(weights)
+
+    rr = np.random.rand()/num_particles
+    i = 0
+    cc = old_weights[i]
+    for mm in range(num_particles):
+        u = rr + (mm-1)/num_particles
+        while u > cc:
+            i += 1
+            cc += old_weights[i]
+        l = old_pi0s[i] - po
+        a0 = np.linalg.norm(l) + np.random.normal(0, 5)
+        l /= l.item(1)
+        l[0,0] += np.random.normal(0,0.001)
+        l /= np.linalg.norm(l)
+        pi0, vi = calculate_trajectory_first(a0, [l]+lms[1:],ec, tau)
+        particle_p[mm] = pi0+vi*t
+        particle_v[mm] = vi
+        pi0s[mm]=pi0
+    return pi0s, particle_p, particle_v
 
 t=0.
 ts = 0.2
+t_s = [t, t+ts]
 traj = Trajectories(particle_p, particle_v)
 plotter = Plotter(initialc-1, len(traj.get_Iposes()), [[-130,70],[-5,130]])
 while t < tau:
+    if t > (desired_measurements-1)*ts:
+        lm = pi+vi*t - po-vo*t
+        lm /= lm.item(1)
+        lm[0,0] += np.random.normal(0,0.0005)
+        lm /= np.linalg.norm(lm)
+        lms.append(lm)
+        t_s.append(t)
+        # weight the particles based on the new bearing measurement
+        weights = update_weights(weights, lm, traj.get_Iposes()[1:], traj.get_Opos())
+
+        # resample the particles based on the weights
+        pi0s, particle_p[2:], particle_v[2:] = resample(pi0s, particle_p[2:], particle_v[2:], weights, t)
     plotter.update_plot(traj.get_Opos(),traj.get_Iposes())
     traj.update()
     t+=ts
