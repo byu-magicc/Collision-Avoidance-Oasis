@@ -325,7 +325,7 @@ class Particle_Filter:
             self.vis[mm] = vi
             self.pi0s[mm]=pi0
 
-num_particles = 5000
+num_particles = 1000
 filter = Particle_Filter(num_particles, lms[0], lms[1], tau, po, ec, r_min, r_max, v_max, ts)
 particle_p = deepcopy([po, pi])
 particle_v = [vo, vi]
