@@ -21,8 +21,8 @@ po=np.array([[0.,0.]]).T
 vo=np.array([[0.,20.]]).T
 
 # generate an example trajectory to calculate LOS vectors and TTC
-actual_pis=[np.array([[-30.,100.]]).T]#, np.array([[30., 100.]]).T]
-actual_vis=[np.array([[0.,-10.]]).T]#, np.array([[-20., 0.]]).T]
+actual_pis=[np.array([[-30.,100.]]).T, np.array([[30., 50.]]).T]
+actual_vis=[np.array([[20.,0.]]).T, np.array([[-20., 0.]]).T]
 
 ec=vo/np.linalg.norm(vo)
 
@@ -335,17 +335,29 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
 
     initial_dt = 0
     max_dt = 5.
-    particle_plots = []
+    problematic_particle_plots = []
+    not_problematic_particle_plots = []
     intruder_plots = []
+    # p_ellipses = []
     for i in range(len(filters)):
         pos = filters[i].get_future_positions(initial_dt)
-        pos = [p for p in pos if la.norm(p-po-vo*t)/(initial_dt+0.001)<=vo_max]
-        # centroid, a, b, alpha = get_ellipse_for_printing(np.reshape(np.asarray(pos), (-1,2)))
-        l,=plt.plot([p.item(0) for p in pos], [p.item(1) for p in pos],marker='.', ls='', markersize=1, label=f'Particles Intruder {i+1}')
+        problematic = []
+        not_problematic = []
+        for p in pos:
+            if la.norm(p-po-vo*t)/(initial_dt+0.0001)<=vo_max:
+                problematic.append(p)
+            else:
+                not_problematic.append(p)
+        
+        l,=plt.plot([p.item(0) for p in problematic], [p.item(1) for p in problematic],marker='.', ls='', markersize=1, label=f'P Particles Intruder {i+1}')
+        nl,=plt.plot([p.item(0) for p in not_problematic], [p.item(1) for p in not_problematic],marker='.', ls='', markersize=1, label=f'Not P Particles Intruder {i+1}')
+        # centroid, a, b, alpha = get_ellipse_for_printing(np.reshape(np.asarray(problematic), (-1,2))) if len(problematic) > 1 else (0,0),5.,5.,0.
         # ellipse = Ellipse(centroid, a, b, alpha, edgecolor='k', fc='None',lw=2)
         # ax = plt.gca()
-        # ax.add_patch(ellipse)
-        particle_plots.append(l)
+        # ax.add_artist(ellipse)
+        # p_ellipses.append(ellipse)
+        problematic_particle_plots.append(l)
+        not_problematic_particle_plots.append(nl)
     for i in range(len(actual_pis)):
         p = actual_pis[i]+actual_vis[i]*(t+initial_dt)
         li, = plt.plot(p.item(0), p.item(1), marker='.', ls='', markersize=10, label=f'Intruder {i+1}')
@@ -366,9 +378,22 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
         # update curve
         for i in range(len(filters)):
             pos = filters[i].get_future_positions(tf-t)
-            pos = [p for p in pos if la.norm(p-po-vo*t)/(tf-t+0.001)<=vo_max]
-            particle_plots[i].set_xdata([p.item(0) for p in pos])
-            particle_plots[i].set_ydata([p.item(1) for p in pos])
+            problematic = []
+            not_problematic = []
+            for p in pos:
+                if la.norm(p-po-vo*t)/(tf-t+0.0001)<=vo_max:
+                    problematic.append(p)
+                else:
+                    not_problematic.append(p)
+            problematic_particle_plots[i].set_xdata([p.item(0) for p in problematic])
+            problematic_particle_plots[i].set_ydata([p.item(1) for p in problematic])
+            not_problematic_particle_plots[i].set_xdata([p.item(0) for p in not_problematic])
+            not_problematic_particle_plots[i].set_ydata([p.item(1) for p in not_problematic])
+            # centroid, a, b, alpha = get_ellipse_for_printing(np.reshape(np.asarray(problematic), (-1,2))) if len(problematic) > 1 else (0,0),5.,5.,0.
+            # p_ellipses[i].set_center(centroid)
+            # p_ellipses[i].set_width(a)
+            # p_ellipses[i].set_height(b)
+            # p_ellipses[i].set_angle(alpha)
             p = actual_pis[i]+actual_vis[i]*(tf)
             intruder_plots[i].set_xdata(p.item(0))
             intruder_plots[i].set_ydata(p.item(1))
@@ -471,7 +496,7 @@ def get_outer_shell(center, points):
                 if dist[i] > dist_old:
                     # Store coordinates of new star farthest away from center
                     # in this slice.
-                    outer_shell[k] = [x[i], y[i]]
+                    outer_shell[k] = [points[i,0], points[i,1]]
                     # Re-assign previous max distance value.
                     dist_old = dist[i]
             # If the angle value is greater than the max slice value.
