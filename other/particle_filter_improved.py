@@ -206,10 +206,11 @@ class Plotter:
         plt.show()
 
 class Particle_Filter:
-    def __init__(self, num_particles, l1, l2, tau, po0, ec, r_min, r_max, v_max, ts) -> None:
+    def __init__(self, num_particles, l1, l2, tau, po0, po1, ec, r_min, r_max, v_max, ts) -> None:
         self.t = ts
         self.num_particles = num_particles
         self.po0 = po0
+        self.pos = [po0, po1]
         self.ts = ts
         self.Rinv = np.diag([1/0.05**2, 1/0.05**2])
         tau += ts
@@ -234,7 +235,7 @@ class Particle_Filter:
             tau_u = tau + np.random.normal(0, 0.5)
 
             a1_u = (r_max-r_min)*np.random.random()+ r_min
-            pos, vel = self.calculate_trajectory_first(a1_u, lus, ec, tau_u)
+            pos, vel = self.calculate_trajectory_first(a1_u, lus, ec, tau_u, self.pos)
             if np.linalg.norm(vel)<=v_max:
                 self.pi0s.append(pos)
                 self.particle_p.append(pos)
@@ -249,11 +250,13 @@ class Particle_Filter:
             future_pos.append(self.particle_p[i] + self.vis[i]*delta_t)
         return future_pos
     
-    def calculate_trajectory_first(self, a1, ls, ec, tau):
+    def calculate_trajectory_first(self, a1, ls, ec, tau, pos):
         if len(ls)<2:
             raise
         l1 = ls[0]
         ls = ls[1:]
+        po0 = pos[0]
+        pos = pos[1:]
         # get the unit vector perpendicular to the camera normal vector
         ecp = np.array([[0, -1],[1,0]]) @ ec
 
@@ -280,7 +283,7 @@ class Particle_Filter:
 
         b = []
         for i in range(len(ls)):
-            b.append(-vo*(i+1)*ts+a1*l1)
+            b.append(po0-pos[i]+a1*l1)
         b.append(-vo*tau+a1*l1)
         b = np.concatenate(b,axis=0)
 
@@ -294,6 +297,7 @@ class Particle_Filter:
     
     def update(self, lm, po, tau):
         # update the weights
+        self.pos.append(po)
         for i in range(self.num_particles):
             # propogate the dynamics
             self.particle_p[i] += self.vis[i]*self.ts
@@ -324,7 +328,7 @@ class Particle_Filter:
             l /= l.item(1)
             l[0,0] += np.random.normal(0,0.001)
             l /= np.linalg.norm(l)
-            pi0, vi = self.calculate_trajectory_first(a0, [l]+self.lms[1:],self.ec, np.average(self.taus))
+            pi0, vi = self.calculate_trajectory_first(a0, [l]+self.lms[1:],self.ec, np.average(self.taus), self.pos)
             self.particle_p[mm] = pi0+vi*self.t
             self.vis[mm] = vi
             self.pi0s[mm]=pi0
@@ -569,7 +573,7 @@ while t < tstop:
         tau = ((traj.get_own_position()-traj.get_intruder_positions()[i]).T @ ec)/((actual_vis[i]-vo).T @ ec)
         if steps == 1:
             # initialize the filters
-            filters.append(Particle_Filter(num_particles, lm_col[i][0], lm_col[i][1], tau, po, ec, r_min, r_max, v_max, ts))
+            filters.append(Particle_Filter(num_particles, lm_col[i][0], lm_col[i][1], tau, po, po+vo*ts, ec, r_min, r_max, v_max, ts))
         if steps >= 2:
             # weight the particles based on the new bearing measurement
             filters[i].update(lm, traj.get_own_position(), tau)
