@@ -94,6 +94,7 @@ class Trajectories:
     def set_particle_positions(self, pposes):
         for i in range(self.num_intruders):
             self.poss[self.num_intruders+1+i*self.num_particles:self.num_intruders+1+(i+1)*self.num_particles] = pposes[i]
+
 class Plotter:
     def __init__(self, num_intruders, num_particles, limits) -> None:
         plt.ion()
@@ -117,6 +118,7 @@ class Plotter:
             self.particles_y.append([])
 
     def update_plot(self, own_pos, intruder_poses, particle_poses):
+        plt.ion()
         head_width = 10
         self.ax.clear()
         # add the points to the respective lists
@@ -322,6 +324,55 @@ class Particle_Filter:
             self.vis[mm] = vi
             self.pi0s[mm]=pi0
 
+def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
+    plt.ioff()
+    fig, ax = plt.subplots()
+
+    initial_dt = 0
+    max_dt = 5.
+    particle_plots = []
+    intruder_plots = []
+    for i in range(len(filters)):
+        pos = filters[i].get_future_positions(initial_dt)
+        l,=plt.plot([p.item(0) for p in pos], [p.item(1) for p in pos],marker='.', ls='', markersize=1, label=f'Particles Intruder {i+1}')
+        particle_plots.append(l)
+    for i in range(len(actual_pis)):
+        p = actual_pis[i]+actual_vis[i]*(t+initial_dt)
+        li, = plt.plot(p.item(0), p.item(1), marker='.', ls='', markersize=10, label=f'Intruder {i+1}')
+        intruder_plots.append(li)
+    p = po+vo*(t+initial_dt)
+    l0, = plt.plot(p.item(0), p.item(1), c='r', marker='.', ls='', markersize=10, label='Ownship')
+    ax = plt.axis([xlims[0], xlims[1], ylims[0], ylims[1]])
+    plt.legend()
+    plt.title(f"Future Predictions for t={t:.3f}s")
+
+    axamp = plt.axes([0.25, .03, 0.50, 0.02])
+    # Slider
+    samp = Slider(axamp, 'Time', 0, max_dt, valinit=initial_dt, valstep=ts)
+
+    def update(val):
+        # amp is the current value of the slider
+        dt = samp.val
+        # update curve
+        for i in range(len(filters)):
+            pos = filters[i].get_future_positions(dt)
+            particle_plots[i].set_xdata([p.item(0) for p in pos])
+            particle_plots[i].set_ydata([p.item(1) for p in pos])
+            p = actual_pis[i]+actual_vis[i]*(t+dt)
+            intruder_plots[i].set_xdata(p.item(0))
+            intruder_plots[i].set_ydata(p.item(1))
+        p = po+vo*(t+dt)
+        l0.set_xdata(p.item(0))
+        l0.set_ydata(p.item(1))
+        # redraw canvas while idle
+        fig.canvas.draw_idle()
+
+    # call update function on slider value change
+    samp.on_changed(update)
+
+    plt.show()
+    plt.ion()
+
 num_particles = 1000
 particle_p = deepcopy([po]+actual_pis)
 particle_v = [vo]+actual_vis
@@ -356,6 +407,7 @@ while t < tstop:
             filters[i].update(lm, traj.get_own_position(), tau)
     if steps >= 1:
         plotter.update_plot(traj.get_own_position(), traj.get_intruder_positions(), [filter.get_particle_positions() for filter in filters])
+        plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, [-200, 200], [0, 200])
     traj.update()
     t+=ts
     steps += 1
