@@ -1,6 +1,8 @@
 import numpy as np
+import numpy.linalg as la
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
+from matplotlib.patches import Ellipse
 import time
 from copy import deepcopy
 
@@ -9,15 +11,18 @@ from copy import deepcopy
 r_min = 10
 r_max = 1000
 
-# maximum predicted velocity
+# maximum predicted velocity (90m/s~200mph)
 v_max = 90
+
+# maximum own-ship velocity (23m/s~50mph)
+vo_max = 23
 
 po=np.array([[0.,0.]]).T
 vo=np.array([[0.,20.]]).T
 
 # generate an example trajectory to calculate LOS vectors and TTC
-actual_pis=[np.array([[-30.,100.]]).T, np.array([[30., 100.]]).T]
-actual_vis=[np.array([[20.,0.]]).T, np.array([[-20., 0.]]).T]
+actual_pis=[np.array([[-30.,100.]]).T]#, np.array([[30., 100.]]).T]
+actual_vis=[np.array([[0.,-10.]]).T]#, np.array([[-20., 0.]]).T]
 
 ec=vo/np.linalg.norm(vo)
 
@@ -206,7 +211,7 @@ class Particle_Filter:
         self.num_particles = num_particles
         self.po0 = po0
         self.ts = ts
-        self.Rinv = np.diag([1/0.05**2, 1/.05**2])
+        self.Rinv = np.diag([1/0.05**2, 1/0.05**2])
         tau += ts
         self.taus = [tau]
         self.ec = ec
@@ -334,7 +339,12 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
     intruder_plots = []
     for i in range(len(filters)):
         pos = filters[i].get_future_positions(initial_dt)
+        pos = [p for p in pos if la.norm(p-po-vo*t)/(initial_dt+0.001)<=vo_max]
+        # centroid, a, b, alpha = get_ellipse_for_printing(np.reshape(np.asarray(pos), (-1,2)))
         l,=plt.plot([p.item(0) for p in pos], [p.item(1) for p in pos],marker='.', ls='', markersize=1, label=f'Particles Intruder {i+1}')
+        # ellipse = Ellipse(centroid, a, b, alpha, edgecolor='k', fc='None',lw=2)
+        # ax = plt.gca()
+        # ax.add_patch(ellipse)
         particle_plots.append(l)
     for i in range(len(actual_pis)):
         p = actual_pis[i]+actual_vis[i]*(t+initial_dt)
@@ -348,20 +358,21 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
 
     axamp = plt.axes([0.25, .03, 0.50, 0.02])
     # Slider
-    samp = Slider(axamp, 'Time', 0, max_dt, valinit=initial_dt, valstep=ts)
+    samp = Slider(axamp, 'Time', t, t+max_dt, valinit=initial_dt, valstep=ts)
 
     def update(val):
         # amp is the current value of the slider
-        dt = samp.val
+        tf = samp.val
         # update curve
         for i in range(len(filters)):
-            pos = filters[i].get_future_positions(dt)
+            pos = filters[i].get_future_positions(tf-t)
+            pos = [p for p in pos if la.norm(p-po-vo*t)/(tf-t+0.001)<=vo_max]
             particle_plots[i].set_xdata([p.item(0) for p in pos])
             particle_plots[i].set_ydata([p.item(1) for p in pos])
-            p = actual_pis[i]+actual_vis[i]*(t+dt)
+            p = actual_pis[i]+actual_vis[i]*(tf)
             intruder_plots[i].set_xdata(p.item(0))
             intruder_plots[i].set_ydata(p.item(1))
-        p = po+vo*(t+dt)
+        p = po+vo*(tf)
         l0.set_xdata(p.item(0))
         l0.set_ydata(p.item(1))
         # redraw canvas while idle
@@ -372,6 +383,138 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
 
     plt.show()
     plt.ion()
+
+# MVEE and get_ellipse_for_printing taken from https://gist.github.com/Gabriel-p/4ddd31422a88e7cdf953
+def mvee(points, tol=0.0001):
+    """
+    Finds the ellipse equation in "center form"
+    (x-c).T * A * (x-c) = 1
+    """
+    N, d = points.shape
+    Q = np.column_stack((points, np.ones(N))).T
+    err = tol+1.0
+    u = np.ones(N)/N
+    while err > tol:
+        # assert u.sum() == 1 # invariant
+        X = np.dot(np.dot(Q, np.diag(u)), Q.T)
+        M = np.diag(np.dot(np.dot(Q.T, la.inv(X)), Q))
+        jdx = np.argmax(M)
+        step_size = (M[jdx]-d-1.0)/((d+1)*(M[jdx]-1.0))
+        new_u = (1-step_size)*u
+        new_u[jdx] += step_size
+        err = la.norm(new_u-u)
+        u = new_u
+    c = np.dot(u, points)
+    A = la.inv(np.dot(np.dot(points.T, np.diag(u)), points)
+               - np.multiply.outer(c, c))/d
+    return A, c
+def dist_2_cent(points, center):
+    '''
+    Obtain distance to center coordinates for the entire x,y array passed.
+    '''
+
+    # delta_x, delta_y = abs(x - center[0]), abs(y - center[1])
+    delta_x, delta_y = (points[:,0] - center[0]), (points[:,1] - center[1])
+    dist = np.sqrt(delta_x ** 2 + delta_y ** 2)
+
+    return delta_x, delta_y, dist
+
+
+def get_outer_shell(center, points):
+    '''
+    Selects those stars located in an 'outer shell' of the points cloud,
+    according to a given accuracy (ie: the 'delta_angle' of the slices the
+    circle is divided in).
+    '''
+
+    delta_x, delta_y, dist = dist_2_cent(points, center)
+
+    # Obtain correct angle with positive x axis for each point.
+    angles = []
+    for dx, dy in zip(*[delta_x, delta_y]):
+        ang = np.rad2deg(np.arctan(abs(dx / dy)))
+        if dx > 0. and dy > 0.:
+            angles.append(ang)
+        elif dx < 0. and dy > 0.:
+            angles.append(180. - ang)
+        elif dx < 0. and dy < 0.:
+            angles.append(270. - ang)
+        elif dx > 0. and dy < 0.:
+            angles.append(360. - ang)
+
+    # Get indexes of angles from min to max value.
+    min_max_ind = np.argsort(angles)
+
+    # Determine sliced circumference. 'delta_angle' sets the number of slices.
+    delta_angle = 1.
+    circle_slices = np.arange(delta_angle, 361., delta_angle)
+
+    # Fill outer shell with as many empty lists as slices.
+    outer_shell = [[] for _ in range(len(circle_slices))]
+    # Initialize first angle value (0\degrees) and index of stars in list
+    # ordered from min to max distance value to center.
+    ang_slice_prev, j = 0., 0
+    # For each slice.
+    for k, ang_slice in enumerate(circle_slices):
+        # Initialize previous maximum distance and counter of stars that have
+        # been processed 'p'.
+        dist_old, p = 0., 0
+        # For each star in the list, except those already processed (ie: with
+        # an angle smaller than 'ang_slice_prev')
+        for i in min_max_ind[j:]:
+            # If the angle is within the slice.
+            if ang_slice_prev <= angles[i] < ang_slice:
+                # Increase the index that stores the number of stars processed.
+                p += 1
+                # If the distance to the center is greater than the previous
+                # one found (if any).
+                if dist[i] > dist_old:
+                    # Store coordinates of new star farthest away from center
+                    # in this slice.
+                    outer_shell[k] = [x[i], y[i]]
+                    # Re-assign previous max distance value.
+                    dist_old = dist[i]
+            # If the angle value is greater than the max slice value.
+            elif angles[i] >= ang_slice:
+                # Increase index of last star processed and break out of
+                # stars loop.
+                j += p
+                break
+
+        # Re-assign minimum slice angle value.
+        ang_slice_prev = ang_slice
+
+    # Remove empty lists from array (ie: slices with no stars in it).
+    outer_shell = np.asarray([x for x in outer_shell if x != []])
+
+    return outer_shell
+def get_ellipse_for_printing(points):
+    center = [np.average(points[:,0]), np.average(points[:,1])]
+    points = get_outer_shell(center, points)
+    A, centroid = mvee(points)
+    # print A
+
+    # V is the rotation matrix that gives the orientation of the ellipsoid.
+    # https://en.wikipedia.org/wiki/Rotation_matrix
+    # http://mathworld.wolfram.com/RotationMatrix.html
+    U, D, V = la.svd(A)
+
+    # x, y radii.
+    rx, ry = 1./np.sqrt(D)
+    # Major and minor semi-axis of the ellipse.
+    dx, dy = 2 * rx, 2 * ry
+    a, b = max(dx, dy), min(dx, dy)
+    # Eccentricity
+    e = np.sqrt(a ** 2 - b ** 2) / a
+
+    # print '\n', U
+    # print D
+    # print V, '\n'
+    arcsin = -1. * np.rad2deg(np.arcsin(V[0][0]))
+    arccos = np.rad2deg(np.arccos(V[0][1]))
+    # Orientation angle (with respect to the x axis counterclockwise).
+    alpha = arccos if arcsin > 0. else -1. * arccos
+    return centroid, a, b, alpha
 
 num_particles = 1000
 particle_p = deepcopy([po]+actual_pis)
