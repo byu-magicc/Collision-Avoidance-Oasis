@@ -238,7 +238,7 @@ class Particle_Filter:
             pos, vel = self.calculate_trajectory_first(a1_u, lus, ec, tau_u, self.pos)
             if np.linalg.norm(vel)<=v_max:
                 self.pi0s.append(pos)
-                self.particle_p.append(pos)
+                self.particle_p.append(pos)#+vel*ts)
                 self.vis.append(vel)
                 self.weights.append(1)
     def get_particle_positions(self):
@@ -249,6 +249,56 @@ class Particle_Filter:
         for i in range(self.num_particles):
             future_pos.append(self.particle_p[i] + self.vis[i]*delta_t)
         return future_pos
+    
+    def calculate_velocity_improved(self, ls, pk, vk):
+        def calc_G(x):
+            px = x.item(0)
+            py = x.item(1)
+            denom = pow(px**2+py**2, 3/2)
+            G = np.array([[py**2, -px*py, 0, 0],
+                          [-px*py, px**2, 0, 0]])/denom
+            return G
+        def g(x):
+            return x[0:2]/la.norm(x[0:2])
+        F = np.eye(4)
+        F[2:,2:] = -np.eye(2)*self.ts # we're working the trajectory back from the current position
+
+        Q = np.eye(4)*0.001
+        R = np.eye(4)*0.05**2
+
+        x = [pk, vk]
+        x0 = deepcopy(x)
+        pn = deepcopy(pk)
+        k = len(ls)
+        while len(x) < k:
+            pn -= vk*self.ts
+            x.append(pn)
+            x.append(vk)
+        x = np.concatenate(x, axis=0)
+        dx = np.ones_like(x)
+
+        W = np.diag([Q]*(k+1)+[R]*k)
+        Winv = la.inv(W)
+        while la.norm(dx) > 0.01:
+            e = np.zeros((6*k, 1))
+            H = np.zeros((6*k,4*k))
+            H[:4*k,:4*k] = np.eye(4*k)
+            for i in range(k-1):
+                H[4*(i+1):4*(i+2), 4*i:4*(i+1)]=F
+            offset = 4*k
+            for i in range(k):
+                H[offset+2*i:offset+2*(i+1),4*i:4*(i+1)] = calc_G(x[4*i:4*(i+1)])
+                if i == 0:
+                    e[0:4] = x0 - x[0:4]
+                else:
+                    e[4*i:4*(i+1)] = F @ x[4*(i-1):4*i] - x[4*i:4*(i+1)]
+                e[offset+2*i:offset+2*(i+1)] = ls[-i-1] - g(x[4*i:4*(i+1)])
+            dx = la.pinv(H.T @ Winv @ H) @ H.T @ Winv @ e
+            x += dx
+        return x[0:2], x[2:4]
+
+
+
     
     def calculate_trajectory_first(self, a1, ls, ec, tau, pos):
         if len(ls)<2:
