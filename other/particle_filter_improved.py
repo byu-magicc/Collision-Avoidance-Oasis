@@ -342,7 +342,8 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
     problematic_particle_plots = []
     not_problematic_particle_plots = []
     intruder_plots = []
-    # p_ellipses = []
+    p_ellipses = []
+    ax = plt.gca()
     for i in range(len(filters)):
         pos = filters[i].get_future_positions(initial_dt)
         problematic = []
@@ -355,11 +356,13 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
         
         l,=plt.plot([p.item(0) for p in problematic], [p.item(1) for p in problematic],marker='.', ls='', markersize=1, label=f'P Particles Intruder {i+1}')
         nl,=plt.plot([p.item(0) for p in not_problematic], [p.item(1) for p in not_problematic],marker='.', ls='', markersize=1, label=f'Not P Particles Intruder {i+1}')
-        # centroid, a, b, alpha = get_ellipse_for_printing(np.reshape(np.asarray(problematic), (-1,2))) if len(problematic) > 1 else (0,0),5.,5.,0.
-        # ellipse = Ellipse(centroid, a, b, alpha, edgecolor='k', fc='None',lw=2)
-        # ax = plt.gca()
-        # ax.add_artist(ellipse)
-        # p_ellipses.append(ellipse)
+        if len(problematic) > 1:
+            centroid, a, b, alpha = get_ellipse_for_printing(problematic)
+        else:
+            centroid, a, b, alpha = (0,0),5.,5.,0.
+        ellipse = Ellipse(centroid, a, b, alpha, edgecolor='k', fc='None',lw=2)
+        ax.add_artist(ellipse)
+        p_ellipses.append(ellipse)
         problematic_particle_plots.append(l)
         not_problematic_particle_plots.append(nl)
     for i in range(len(actual_pis)):
@@ -393,11 +396,14 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
             problematic_particle_plots[i].set_ydata([p.item(1) for p in problematic])
             not_problematic_particle_plots[i].set_xdata([p.item(0) for p in not_problematic])
             not_problematic_particle_plots[i].set_ydata([p.item(1) for p in not_problematic])
-            # centroid, a, b, alpha = get_ellipse_for_printing(np.reshape(np.asarray(problematic), (-1,2))) if len(problematic) > 1 else (0,0),5.,5.,0.
-            # p_ellipses[i].set_center(centroid)
-            # p_ellipses[i].set_width(a)
-            # p_ellipses[i].set_height(b)
-            # p_ellipses[i].set_angle(alpha)
+            if len(problematic) > 1:
+                centroid, a, b, alpha = get_ellipse_for_printing(problematic)
+            else:
+                 centroid, a, b, alpha = (0,0),5.,5.,0.
+            p_ellipses[i].set_center(centroid)
+            p_ellipses[i].set_width(a)
+            p_ellipses[i].set_height(b)
+            p_ellipses[i].set_angle(alpha)
             p = actual_pis[i]+actual_vis[i]*(tf)
             intruder_plots[i].set_xdata(p.item(0))
             intruder_plots[i].set_ydata(p.item(1))
@@ -405,7 +411,7 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
         l0.set_xdata(p.item(0))
         l0.set_ydata(p.item(1))
         # redraw canvas while idle
-        fig.canvas.draw_idle()
+        fig.canvas.draw()
 
     # call update function on slider value change
     samp.on_changed(update)
@@ -413,125 +419,26 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
     plt.show()
     plt.ion()
 
-# MVEE and get_ellipse_for_printing taken from https://gist.github.com/Gabriel-p/4ddd31422a88e7cdf953
-def mvee(points, tol=0.0001):
-    """
-    Finds the ellipse equation in "center form"
-    (x-c).T * A * (x-c) = 1
-    """
-    N, d = points.shape
-    Q = np.column_stack((points, np.ones(N))).T
-    err = tol+1.0
-    u = np.ones(N)/N
-    while err > tol:
-        # assert u.sum() == 1 # invariant
-        X = np.dot(np.dot(Q, np.diag(u)), Q.T)
-        M = np.diag(np.dot(np.dot(Q.T, la.inv(X)), Q))
-        jdx = np.argmax(M)
-        step_size = (M[jdx]-d-1.0)/((d+1)*(M[jdx]-1.0))
-        new_u = (1-step_size)*u
-        new_u[jdx] += step_size
-        err = la.norm(new_u-u)
-        u = new_u
-    c = np.dot(u, points)
-    A = la.inv(np.dot(np.dot(points.T, np.diag(u)), points)
-               - np.multiply.outer(c, c))/d
-    return A, c
-def dist_2_cent(points, center):
-    '''
-    Obtain distance to center coordinates for the entire x,y array passed.
-    '''
-
-    # delta_x, delta_y = abs(x - center[0]), abs(y - center[1])
-    delta_x, delta_y = (points[:,0] - center[0]), (points[:,1] - center[1])
-    dist = np.sqrt(delta_x ** 2 + delta_y ** 2)
-
-    return delta_x, delta_y, dist
-
-
-def get_outer_shell(center, points):
-    '''
-    Selects those stars located in an 'outer shell' of the points cloud,
-    according to a given accuracy (ie: the 'delta_angle' of the slices the
-    circle is divided in).
-    '''
-
-    delta_x, delta_y, dist = dist_2_cent(points, center)
-
-    # Obtain correct angle with positive x axis for each point.
-    angles = []
-    for dx, dy in zip(*[delta_x, delta_y]):
-        ang = np.rad2deg(np.arctan(abs(dx / dy)))
-        if dx > 0. and dy > 0.:
-            angles.append(ang)
-        elif dx < 0. and dy > 0.:
-            angles.append(180. - ang)
-        elif dx < 0. and dy < 0.:
-            angles.append(270. - ang)
-        elif dx > 0. and dy < 0.:
-            angles.append(360. - ang)
-
-    # Get indexes of angles from min to max value.
-    min_max_ind = np.argsort(angles)
-
-    # Determine sliced circumference. 'delta_angle' sets the number of slices.
-    delta_angle = 1.
-    circle_slices = np.arange(delta_angle, 361., delta_angle)
-
-    # Fill outer shell with as many empty lists as slices.
-    outer_shell = [[] for _ in range(len(circle_slices))]
-    # Initialize first angle value (0\degrees) and index of stars in list
-    # ordered from min to max distance value to center.
-    ang_slice_prev, j = 0., 0
-    # For each slice.
-    for k, ang_slice in enumerate(circle_slices):
-        # Initialize previous maximum distance and counter of stars that have
-        # been processed 'p'.
-        dist_old, p = 0., 0
-        # For each star in the list, except those already processed (ie: with
-        # an angle smaller than 'ang_slice_prev')
-        for i in min_max_ind[j:]:
-            # If the angle is within the slice.
-            if ang_slice_prev <= angles[i] < ang_slice:
-                # Increase the index that stores the number of stars processed.
-                p += 1
-                # If the distance to the center is greater than the previous
-                # one found (if any).
-                if dist[i] > dist_old:
-                    # Store coordinates of new star farthest away from center
-                    # in this slice.
-                    outer_shell[k] = [points[i,0], points[i,1]]
-                    # Re-assign previous max distance value.
-                    dist_old = dist[i]
-            # If the angle value is greater than the max slice value.
-            elif angles[i] >= ang_slice:
-                # Increase index of last star processed and break out of
-                # stars loop.
-                j += p
-                break
-
-        # Re-assign minimum slice angle value.
-        ang_slice_prev = ang_slice
-
-    # Remove empty lists from array (ie: slices with no stars in it).
-    outer_shell = np.asarray([x for x in outer_shell if x != []])
-
-    return outer_shell
 def get_ellipse_for_printing(points):
-    center = [np.average(points[:,0]), np.average(points[:,1])]
-    points = get_outer_shell(center, points)
-    A, centroid = mvee(points)
+    center = np.mean(np.asarray(points), axis=0)
+    reshaped = np.reshape(np.stack(points, axis=1),(2,-1))
+    A = np.cov(reshaped)#np.zeros((center.shape[0],center.shape[0]))
+    # n = len(points)
+    # for point in points:
+    #     A += (point - center) @ (point - center).T/(n-1)
+    
     # print A
 
     # V is the rotation matrix that gives the orientation of the ellipsoid.
     # https://en.wikipedia.org/wiki/Rotation_matrix
     # http://mathworld.wolfram.com/RotationMatrix.html
     U, D, V = la.svd(A)
-
+    
     # x, y radii.
-    rx, ry = 1./np.sqrt(D)
+    l1, l2 = np.sqrt(D)
     # Major and minor semi-axis of the ellipse.
-    dx, dy = 2 * rx, 2 * ry
+    s = np.sqrt(5.991) # cooresponds to 95% confidence interval
+    dx, dy = 2 * l1 * s, 2 * l2 * s
     a, b = max(dx, dy), min(dx, dy)
     # Eccentricity
     e = np.sqrt(a ** 2 - b ** 2) / a
@@ -539,10 +446,9 @@ def get_ellipse_for_printing(points):
     # print '\n', U
     # print D
     # print V, '\n'
-    arcsin = -1. * np.rad2deg(np.arcsin(V[0][0]))
-    arccos = np.rad2deg(np.arccos(V[0][1]))
     # Orientation angle (with respect to the x axis counterclockwise).
-    alpha = arccos if arcsin > 0. else -1. * arccos
+    alpha = np.rad2deg(np.arctan2(V[0][1],V[0][0]))
+    centroid = (center.item(0), center.item(1))
     return centroid, a, b, alpha
 
 num_particles = 1000
