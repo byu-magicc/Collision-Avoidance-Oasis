@@ -250,16 +250,19 @@ class Particle_Filter:
             future_pos.append(self.particle_p[i] + self.vis[i]*delta_t)
         return future_pos
     
-    def calculate_velocity_improved(self, ls, pk, vk):
-        def calc_G(x):
-            px = x.item(0)
-            py = x.item(1)
-            denom = pow(px**2+py**2, 3/2)
-            G = np.array([[py**2, -px*py, 0, 0],
-                          [-px*py, px**2, 0, 0]])/denom
+    # Implementation of Gauss-Newton batch discrete-time estimation (taken from State Estimation for Robotics by Tim Barfoot, pp 128-134)
+    def calculate_velocity_improved(self, ls, pk, vk, pOs):
+        def calc_G(x, po):
+            pr = x[0:2] - po
+            prx = pr.item(0)
+            pry = pr.item(1)
+            denom = pow(prx**2+pry**2, 3/2)
+            G = np.array([[pry**2, -prx*pry, 0, 0],
+                          [-prx*pry, prx**2, 0, 0]])/denom
             return G
-        def g(x):
-            return x[0:2]/la.norm(x[0:2])
+        def g(x, po):
+            pr = x[0:2] - po
+            return pr/la.norm(pr)
         F = np.eye(4)
         F[2:,2:] = -np.eye(2)*self.ts # we're working the trajectory back from the current position
 
@@ -292,7 +295,7 @@ class Particle_Filter:
                     e[0:4] = x0 - x[0:4]
                 else:
                     e[4*i:4*(i+1)] = F @ x[4*(i-1):4*i] - x[4*i:4*(i+1)]
-                e[offset+2*i:offset+2*(i+1)] = ls[-i-1] - g(x[4*i:4*(i+1)])
+                e[offset+2*i:offset+2*(i+1)] = ls[-i-1] - g(x[4*i:4*(i+1)], pOs[-i-1])
             dx = la.pinv(H.T @ Winv @ H) @ H.T @ Winv @ e
             x += dx
         return x[0:2], x[2:4]
