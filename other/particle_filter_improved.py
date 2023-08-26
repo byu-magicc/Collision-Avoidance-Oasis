@@ -264,23 +264,25 @@ class Particle_Filter:
             pr = x[0:2] - po
             return pr/la.norm(pr)
         F = np.eye(4)
-        F[2:,2:] = -np.eye(2)*self.ts # we're working the trajectory back from the current position
+        F[0:2,2:] = -np.eye(2)*self.ts # we're working the trajectory back from the current position
 
-        Q = np.eye(4)*0.001
-        R = np.eye(4)*0.05**2
+        P0 = [0.001, 0.001, 1., 1.]
+        Q = [0.001]*4
+        R = [0.05**2]*2
 
-        x = [pk, vk]
+        x = [deepcopy(pk), deepcopy(vk)]
         x0 = deepcopy(x)
+        x0 = np.concatenate(x0, axis=0)
         pn = deepcopy(pk)
         k = len(ls)
-        while len(x) < k:
+        while len(x) < 2*k:
             pn -= vk*self.ts
-            x.append(pn)
+            x.append(deepcopy(pn))
             x.append(vk)
         x = np.concatenate(x, axis=0)
         dx = np.ones_like(x)
 
-        W = np.diag([Q]*(k+1)+[R]*k)
+        W = np.diag(P0 + Q*(k-1)+R*k)
         Winv = la.inv(W)
         while la.norm(dx) > 0.01:
             e = np.zeros((6*k, 1))
@@ -290,7 +292,7 @@ class Particle_Filter:
                 H[4*(i+1):4*(i+2), 4*i:4*(i+1)]=F
             offset = 4*k
             for i in range(k):
-                H[offset+2*i:offset+2*(i+1),4*i:4*(i+1)] = calc_G(x[4*i:4*(i+1)])
+                H[offset+2*i:offset+2*(i+1),4*i:4*(i+1)] = calc_G(x[4*i:4*(i+1)], pOs[-i-1])
                 if i == 0:
                     e[0:4] = x0 - x[0:4]
                 else:
@@ -298,7 +300,7 @@ class Particle_Filter:
                 e[offset+2*i:offset+2*(i+1)] = ls[-i-1] - g(x[4*i:4*(i+1)], pOs[-i-1])
             dx = la.pinv(H.T @ Winv @ H) @ H.T @ Winv @ e
             x += dx
-        return x[0:2], x[2:4]
+        return x[0:2], x[2:4], x[4*(k-1):4*(k-1)+2] # return pk, vk, p0
 
 
 
@@ -381,10 +383,11 @@ class Particle_Filter:
             l /= l.item(1)
             l[0,0] += np.random.normal(0,0.001)
             l /= np.linalg.norm(l)
-            pi0, vi = self.calculate_trajectory_first(a0, [l]+self.lms[1:],self.ec, np.average(self.taus), self.pos)
-            self.particle_p[mm] = pi0+vi*self.t
-            self.vis[mm] = vi
-            self.pi0s[mm]=pi0
+            pi0, vi = self.calculate_trajectory_first(a0, [l]+self.lms[1:],self.ec, np.average(self.taus), self.pos) # use this to get an initial guess of the position and velocity
+            pk, vk, pi0n = self.calculate_velocity_improved(self.lms, pi0+vi*self.t, vi, self.pos)
+            self.particle_p[mm] = pk
+            self.vis[mm] = vk
+            self.pi0s[mm]=pi0n
 
 def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
     plt.ioff()
