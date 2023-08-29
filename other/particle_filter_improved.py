@@ -238,7 +238,7 @@ class Particle_Filter:
             pos, vel = self.calculate_trajectory_first(a1_u, lus, ec, tau_u, self.pos)
             if np.linalg.norm(vel)<=v_max:
                 self.pi0s.append(pos)
-                self.particle_p.append(pos)#+vel*ts)
+                self.particle_p.append(pos+vel*ts)
                 self.vis.append(vel)
                 self.weights.append(1)
     def get_particle_positions(self):
@@ -267,7 +267,7 @@ class Particle_Filter:
         F[0:2,2:] = -np.eye(2)*self.ts # we're working the trajectory back from the current position
 
         P0 = [0.001, 0.001, 1., 1.]
-        Q = [0.001]*4
+        Q = [0.01]*4
         R = [0.05**2]*2
 
         x = [deepcopy(pk), deepcopy(vk)]
@@ -284,7 +284,8 @@ class Particle_Filter:
 
         W = np.diag(P0 + Q*(k-1)+R*k)
         Winv = la.inv(W)
-        while la.norm(dx) > 0.01:
+        iter = 0
+        while (dx.max() > 0.01 or dx.min() < -0.01) and iter < 10:
             e = np.zeros((6*k, 1))
             H = np.zeros((6*k,4*k))
             H[:4*k,:4*k] = np.eye(4*k)
@@ -300,6 +301,7 @@ class Particle_Filter:
                 e[offset+2*i:offset+2*(i+1)] = ls[-i-1] - g(x[4*i:4*(i+1)], pOs[-i-1])
             dx = la.pinv(H.T @ Winv @ H) @ H.T @ Winv @ e
             x += dx
+            iter += 1
         return x[0:2], x[2:4], x[4*(k-1):4*(k-1)+2] # return pk, vk, p0
 
 
