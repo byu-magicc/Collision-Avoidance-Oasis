@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.linalg as la
+from scipy.linalg import solve_banded
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 from matplotlib.patches import Ellipse
@@ -251,7 +252,7 @@ class Particle_Filter:
         return future_pos
     
     # Implementation of Gauss-Newton batch discrete-time estimation (taken from State Estimation for Robotics by Tim Barfoot, pp 128-134)
-    def calculate_velocity_improved(self, ls, pk, vk, pOs):
+    def calculate_velocity_improved(self, ls, pk, vk, pOs, tau, ec, vo):
         def calc_G(x, po):
             pr = x[0:2] - po
             prx = pr.item(0)
@@ -260,49 +261,98 @@ class Particle_Filter:
             G = np.array([[pry**2, -prx*pry, 0, 0],
                           [-prx*pry, prx**2, 0, 0]])/denom
             return G
+        def calc_G_tau(pif, pof, vi, vo):
+            denom = ((vo-vi).T @ ec).item(0)
+            numer = ((pif - pof).T@ec).item(0)
+            return np.array([[ec.item(0)/denom, ec.item(1)/denom, ec.item(0)*numer/denom**2, ec.item(1)*numer/denom**2]])
         def g(x, po):
             pr = x[0:2] - po
             return pr/la.norm(pr)
+        def g_tau(pif, vi,pof,vo):
+            return (pif - pof).T @ ec/((vo - vi).T @ ec)
         F = np.eye(4)
         F[0:2,2:] = -np.eye(2)*self.ts # we're working the trajectory back from the current position
+        Ftau = np.eye(4)
+        Ftau[0:2,2:] = -np.eye(2)*tau
+        Ftau_pos = deepcopy(Ftau)
+        Ftau_pos[0:2,2:] = np.eye(2)*tau
 
-        P0 = [0.001, 0.001, 1., 1.]
+        P0 = [0.001, 0.001, 10., 10.]
         Q = [0.01]*4
-        R = [0.05**2]*2
+        R = [0.01**2]*2
+        Rtau = [0.5**2]
 
         x = [deepcopy(pk), deepcopy(vk)]
         x0 = deepcopy(x)
         x0 = np.concatenate(x0, axis=0)
         pn = deepcopy(pk)
         k = len(ls)
-        while len(x) < 2*k:
+        x.insert(0, pk + vk*tau)
+        x.insert(1, deepcopy(vk))
+        po = pOs[-1]
+        while len(x) < 2*(k+1):
             pn -= vk*self.ts
             x.append(deepcopy(pn))
             x.append(vk)
         x = np.concatenate(x, axis=0)
         dx = np.ones_like(x)
 
-        W = np.diag(P0 + Q*(k-1)+R*k)
+        W = np.diag(Q + P0 + Q*(k-1)+Rtau + R*k)
         Winv = la.inv(W)
         iter = 0
         while (dx.max() > 0.01 or dx.min() < -0.01) and iter < 10:
-            e = np.zeros((6*k, 1))
-            H = np.zeros((6*k,4*k))
-            H[:4*k,:4*k] = np.eye(4*k)
-            for i in range(k-1):
-                H[4*(i+1):4*(i+2), 4*i:4*(i+1)]=F
-            offset = 4*k
+            e = np.zeros((6*(k)+5, 1))
+            H = np.zeros((6*k+5,4*(k+1)))
+            H[:4*(k+1),:4*(k+1)] = np.eye(4*(k+1))
+            H[4:8, 0:4] = -Ftau
+            for i in range(1,k):
+                H[4*(i+1):4*(i+2), 4*i:4*(i+1)]=-F
+            offset = 4*k+5
+            H[4*(k+1):4*k+5,0:4] = calc_G_tau(x[0:2],po+vo*tau, x[2:4], vo)
+            e[0:4] = Ftau_pos @ x[4:8] - x[0:4] #?
+            e[offset-1] = -g_tau(x[0:2], x[6:8], po+vo*tau, vo)
             for i in range(k):
-                H[offset+2*i:offset+2*(i+1),4*i:4*(i+1)] = calc_G(x[4*i:4*(i+1)], pOs[-i-1])
+                H[offset+2*i:offset+2*(i+1),4*(i+1):4*(i+2)] = calc_G(x[4*(i+1):4*(i+2)], pOs[-i-1])
                 if i == 0:
-                    e[0:4] = x0 - x[0:4]
+                    e[4:8] = x0 - x[4:8]
                 else:
-                    e[4*i:4*(i+1)] = F @ x[4*(i-1):4*i] - x[4*i:4*(i+1)]
-                e[offset+2*i:offset+2*(i+1)] = ls[-i-1] - g(x[4*i:4*(i+1)], pOs[-i-1])
-            dx = la.pinv(H.T @ Winv @ H) @ H.T @ Winv @ e
+                    e[4*(i+1):4*(i+2)] = F @ x[4*(i):4*(i+1)] - x[4*(i+1):4*(i+2)]
+                e[offset+2*i:offset+2*(i+1)] = ls[-i-1] - g(x[4*(i+1):4*(i+2)], pOs[-i-1])
+            # print("e:")
+            # print(e)
+            # print()
+            np.set_printoptions(linewidth=2000, floatmode='fixed')
+            # print("H:")
+            # print(H)
+            # print(H.T @ Winv @ H)
+            def _diagonal_banded(l_and_u, a):
+                n = a.shape[1]
+                if a.shape != (n, n):
+                    raise ValueError("Matrix must be square (has shape %s)" % (a.shape,))
+                (nlower, nupper) = l_and_u
+                if nlower > n or nupper > n:
+                    raise ValueError("Number of nonzero diagonals must be less than square dimension")
+                upper = np.empty((nupper, n), dtype=a.dtype)
+                mid = np.empty((1, n), dtype=a.dtype)
+                lower = np.empty((nlower, n), dtype=a.dtype)
+
+                for i in range(1, nupper + 1):
+                    for j in range(n - i):
+                        upper[nupper - i, i + j] = a[j, i + j]
+
+                for i in range(n):
+                    mid[0, i] = a[i, i]
+
+                for i in range(nlower):
+                    for j in range(n - i - 1):
+                        lower[i, j] = a[i + j + 1, j]
+                return np.concatenate((upper, mid, lower))
+                
+            # diags = (5,5)
+            dx = la.solve(H.T @ Winv @ H, H.T @ Winv @ e)[0]
             x += dx
             iter += 1
-        return x[0:2], x[2:4], x[4*(k-1):4*(k-1)+2] # return pk, vk, p0
+        return x[4:6], x[6:8], x[4*k:4*k+2] # return pk, vk, p0
 
 
 
@@ -352,7 +402,7 @@ class Particle_Filter:
         vi = x[-2:]
         return pi0, vi
     
-    def update(self, lm, po, tau):
+    def update(self, lm, po, tau, vo):
         # update the weights
         self.pos.append(po)
         for i in range(self.num_particles):
@@ -370,7 +420,8 @@ class Particle_Filter:
         self.taus.append(tau + self.t)
 
         # resample
-        old_pi0s = deepcopy(self.pi0s)
+        old_pis = deepcopy(self.particle_p)
+        old_vis = deepcopy(self.vis)
 
         rr = np.random.rand()/self.num_particles
         i = 0
@@ -380,13 +431,18 @@ class Particle_Filter:
             while u > cc:
                 i += 1
                 cc += self.weights[i]
-            l = old_pi0s[i] - self.po0
-            a0 = max(np.linalg.norm(l) + np.random.normal(0, 5), self.r_min)
+            l = old_pis[i] - po
+            ak = max(np.linalg.norm(l) + np.random.normal(0, 5), self.r_min)
             l /= l.item(1)
             l[0,0] += np.random.normal(0,0.001)
             l /= np.linalg.norm(l)
-            pi0, vi = self.calculate_trajectory_first(a0, [l]+self.lms[1:],self.ec, np.average(self.taus), self.pos) # use this to get an initial guess of the position and velocity
-            pk, vk, pi0n = self.calculate_velocity_improved(self.lms, pi0+vi*self.t, vi, self.pos)
+            # pi0, vi = self.calculate_trajectory_first(a0, [l]+self.lms[1:],self.ec, np.average(self.taus), self.pos) # use this to get an initial guess of the position and velocity
+            # old way
+            # self.particle_p[mm] = pi0+vi*self.t
+            # self.vis[mm] = vi
+            # self.pi0s[mm] = pi0
+            # new way
+            pk, vk, pi0n = self.calculate_velocity_improved(self.lms, ak*l+po, old_vis[i], self.pos, tau, self.ec, vo)
             self.particle_p[mm] = pk
             self.vis[mm] = vk
             self.pi0s[mm]=pi0n
@@ -540,7 +596,7 @@ while t < tstop:
             filters.append(Particle_Filter(num_particles, lm_col[i][0], lm_col[i][1], tau, po, po+vo*ts, ec, r_min, r_max, v_max, ts))
         if steps >= 2:
             # weight the particles based on the new bearing measurement
-            filters[i].update(lm, traj.get_own_position(), tau)
+            filters[i].update(lm, traj.get_own_position(), tau, vo)
     if steps >= 1:
         plotter.update_plot(traj.get_own_position(), traj.get_intruder_positions(), [filter.get_particle_positions() for filter in filters])
         plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, [-200, 200], [0, 200])
