@@ -9,7 +9,7 @@ class Particle_Filter:
         self.po0 = po0
         self.pos = [po0, po1]
         self.ts = ts
-        self.Rinv = np.diag([1/0.05**2, 1/0.05**2])
+        self.Rinv = np.diag([1/0.1**2, 1/0.1**2])
         tau += ts
         self.taus = [tau]
         self.ec = ec
@@ -48,8 +48,14 @@ class Particle_Filter:
         return future_pos
     
     # Implementation of Gauss-Newton batch discrete-time estimation (taken from State Estimation for Robotics by Tim Barfoot, pp 128-134)
-    def calculate_velocity_improved(self, ls, pk, vk, pOs):
+    def calculate_velocity_improved(self, ls, pi0, vi, pOs):
         # vk = np.array([[1., 1.]]).T
+        k = len(ls)
+        R = [0.01**2]*2
+        Q = [0.0001]*4
+        P0 = [0.0001, 0.0001, 100., 100.]
+        W = np.diag(P0 + Q*(k-1) + R*k)
+        Winv = la.inv(W)
         def calc_G(x, po):
             pr = x[0:2] - po
             prx = pr.item(0)
@@ -61,49 +67,45 @@ class Particle_Filter:
         def g(x, po):
             pr = x[0:2] - po
             return pr/la.norm(pr)
+        # def calc_G_tau(x, po):
+
         F = np.eye(4)
-        F[0:2,2:] = -np.eye(2)*self.ts # we're working the trajectory back from the current position
-
-        P0 = [0.001, 0.001, 100., 100.]
-        Q = [0.001]*4
-        R = [0.02**2]*2
-
-        x = [deepcopy(pk), deepcopy(vk)]
+        F[0:2,2:] = self.ts*np.eye(2)
+        Htop = np.eye(4*k)
+        for i in range(k-1):
+            Htop[4*(i+1):4*(i+2),4*i:4*(i+1)] = -F
+        
+        x = [deepcopy(pi0), deepcopy(vi)]
         x0 = deepcopy(x)
         x0 = np.concatenate(x0, axis=0)
-        pn = deepcopy(pk)
-        k = len(ls)
-        while len(x) < 2*k:
-            pn -= vk*self.ts
+        pn = deepcopy(pi0)
+        for i in range(k-1):
+            pn += vi*self.ts
             x.append(deepcopy(pn))
-            x.append(vk)
+            x.append(deepcopy(vi))
         x = np.concatenate(x, axis=0)
-        dx = np.ones_like(x)
 
-        W = np.diag(P0 + Q*(k-1)+R*k)
-        Winv = la.inv(W)
+        dx = np.ones_like(x)
         iter = 0
-        amp = 0.01
-        while (dx.max() > amp or dx.min() < -amp):# and iter < 100:
-            e = np.zeros((6*k, 1))
-            H = np.zeros((6*k,4*k))
-            H[:4*k,:4*k] = np.eye(4*k)
-            for i in range(k-1):
-                H[4*(i+1):4*(i+2), 4*i:4*(i+1)]=-F
-            offset = 4*k
+        amp = 0.005
+        e = np.zeros((6*k,1))
+        Hbottom = np.zeros((2*k,4*k))
+        o = 4*k #offset for second half of error array
+        while (dx.max() > amp or dx.min() < -amp):
             for i in range(k):
-                H[offset+2*i:offset+2*(i+1),4*i:4*(i+1)] = calc_G(x[4*i:4*(i+1)], pOs[-i-1])
                 if i == 0:
-                    e[0:4] = x0 - x[0:4]
+                    norm = x0
                 else:
-                    e[4*i:4*(i+1)] = F @ x[4*(i-1):4*i] - x[4*i:4*(i+1)]
-                e[offset+2*i:offset+2*(i+1)] = ls[-i-1] - g(x[4*i:4*(i+1)], pOs[-i-1])
+                    norm = F@x[4*(i-1):4*(i)]
+                e[4*i:4*(i+1)] = norm - x[4*i:4*(i+1)]
+                e[o+2*i:o+2*(i+1)] = ls[i] - g(x[4*i:4*(i+1)], pOs[i])
+                Hbottom[2*i:2*(i+1),4*i:4*(i+1)] = calc_G(x[4*i:4*(i+1)],pOs[i])
+            H = np.concatenate([Htop,Hbottom],axis=0)
             dx = la.pinv(H.T @ Winv @ H) @ H.T @ Winv @ e
             x += dx
             iter += 1
-        return x[0:2], x[2:4], x[4*(k-1):4*(k-1)+2] # return pk, vk, p0
 
-
+        return x[4*(k-1):4*(k-1)+2], x[4*(k-1)+2:], x[0:2] # return pk, vk, p0
 
     
     def calculate_trajectory_first(self, a1, ls, ec, tau, pos):
@@ -148,13 +150,13 @@ class Particle_Filter:
 
         # set the result up as a possible trajectory to plot along 
         # with the original example
-        pi0 = a1*l1
+        pi0 = a1*l1 + self.po0
         vi = x[-2:]
         return pi0, vi
     
     def update(self, lm, po, tau):
         # update the weights
-        self.pos.append(po)
+        self.pos.append(deepcopy(po))
         for i in range(self.num_particles):
             # propogate the dynamics
             self.particle_p[i] += self.vis[i]*self.ts
@@ -165,13 +167,13 @@ class Particle_Filter:
             self.weights[i] = np.exp(-1/2. * (lm-phat).T @ self.Rinv @ (lm-phat)).item(0)
         sum = np.sum(self.weights)
         self.weights = [x/sum for x in self.weights]
-        self.lms.append(lm)
+        self.lms.append(deepcopy(lm))
         self.t += self.ts
         self.taus.append(tau + self.t)
 
         # resample
         old_pi0s = deepcopy(self.pi0s)
-        old_ps = deepcopy(self.particle_p)
+        # old_ps = deepcopy(self.particle_p)
 
         rr = np.random.rand()/self.num_particles
         i = 0
@@ -191,13 +193,15 @@ class Particle_Filter:
             # pk, vk, pi0n = self.calculate_velocity_improved(self.lms, pi0+vi*self.t, vi, self.pos)
 
             # new way
-            l = old_ps[i] - po
+            l = old_pi0s[i] - self.po0
             a0 = max(np.linalg.norm(l) + np.random.normal(0, 5), self.r_min)
             l /= l.item(1)
             l[0,0] += np.random.normal(0,0.001)
             l /= np.linalg.norm(l)
             vi = np.array([[1., 1.]]).T
-            pk, vk, pi0n = self.calculate_velocity_improved(self.lms, l*a0, vi, self.pos)
+            pi0, vi = self.calculate_trajectory_first(a0, [l]+self.lms[1:],self.ec, np.average(self.taus), self.pos) # use this to get an initial guess of the position and velocity
+            # pk, vk, pi0n = self.calculate_velocity_improved(self.lms, pi0, vi, self.pos)
+            pk, vk, pi0n = (pi0+vi*self.t, vi, pi0)
             self.particle_p[mm] = pk
             self.vis[mm] = vk
             self.pi0s[mm]=pi0n
