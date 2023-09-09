@@ -6,6 +6,7 @@ from matplotlib.patches import Ellipse
 from particle_filter import Particle_Filter
 import time
 from copy import deepcopy
+from path_planner import PathPlanner
 
 # define constraints for the optimizer to use later on
 # minimum and maximum ranges of detection
@@ -206,6 +207,47 @@ class Plotter:
 
         plt.show()
 
+planner = PathPlanner((0,200))
+from scipy.stats import gaussian_kde
+def calculate_problematic_and_pdfs(t, ts, filters, po, vo, vo_max):
+    max_dt = 5.
+    kdes = []
+    problematic = []
+    not_problematic = []
+
+    nf = len(filters)
+    dts = np.arange(0, max_dt+ts, ts)
+    for i in range(nf):
+        kdes.append([])
+        problematic.append([])
+        not_problematic.append([])
+        for j in range(len(dts)):
+            problematic[i].append([])
+            not_problematic[i].append([])
+    for i, dt in enumerate(dts):
+        for j in range(nf):
+            x = []
+            y = []
+            pos = filters[j].get_future_positions(dt)
+            for p in pos:
+                if la.norm(p-po-vo*t)/(dt+0.0001)<=vo_max:
+                    problematic[j][i].append(p)
+                    x.append(p.item(0))
+                    y.append(p.item(1))
+                else:
+                    not_problematic[j][i].append(p)
+            if len(problematic[j][i]) <= 1:
+                kdes[j].append(None)
+            else:
+                x = np.array(x)
+                y = np.array(y)
+                k = gaussian_kde(np.array([x,y]))
+                kdes[j].append(k)
+    return kdes, problematic, not_problematic
+
+            
+
+
 def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
     plt.ioff()
     fig, ax = plt.subplots()
@@ -216,7 +258,11 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
     not_problematic_particle_plots = []
     intruder_plots = []
     p_ellipses = []
-    ax = plt.gca()
+    ax_gca = plt.gca()
+    contours = [None]*len(filters)
+
+    kdes, problematic, not_problematic = calculate_problematic_and_pdfs(t, ts, filters, po, vo, vo_max) #TODO: Finish incorperating this into the plotter
+
     for i in range(len(filters)):
         pos = filters[i].get_future_positions(initial_dt)
         problematic = []
@@ -226,15 +272,30 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
                 problematic.append(p)
             else:
                 not_problematic.append(p)
-        
-        l,=plt.plot([p.item(0) for p in problematic], [p.item(1) for p in problematic],marker='.', ls='', markersize=1, label=f'P Particles Intruder {i+1}')
+        x = [p.item(0) for p in problematic]
+        y = [p.item(1) for p in problematic]
+        l,=plt.plot(x, y,marker='.', ls='', markersize=1, label=f'P Particles Intruder {i+1}')
         nl,=plt.plot([p.item(0) for p in not_problematic], [p.item(1) for p in not_problematic],marker='.', ls='', markersize=1, label=f'Not P Particles Intruder {i+1}')
+        if contours[i] is not None:
+            for coll in contours[i].collections:
+                coll.remove()
+            contours[i] = None
         if len(problematic) > 1:
             centroid, a, b, alpha = get_ellipse_for_printing(problematic)
+            x = np.array(x)
+            y = np.array(y)
+            k = gaussian_kde(np.array([x,y]))
+            nbins = 100
+
+            xi, yi = np.mgrid[x.min():x.max():nbins*1j, y.min():y.max():nbins*1j]
+            zi = k(np.vstack([xi.flatten(), yi.flatten()]))
+
+            contours[i] = ax.contour(xi, yi, zi.reshape(xi.shape))
         else:
             centroid, a, b, alpha = (0,0),5.,5.,0.
+            
         ellipse = Ellipse(centroid, a, b, alpha, edgecolor='k', fc='None',lw=2)
-        ax.add_artist(ellipse)
+        ax_gca.add_artist(ellipse)
         p_ellipses.append(ellipse)
         problematic_particle_plots.append(l)
         not_problematic_particle_plots.append(nl)
@@ -244,7 +305,7 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
         intruder_plots.append(li)
     p = po+vo*(t+initial_dt)
     l0, = plt.plot(p.item(0), p.item(1), c='r', marker='.', ls='', markersize=10, label='Ownship')
-    ax = plt.axis([xlims[0], xlims[1], ylims[0], ylims[1]])
+    ax_gca = plt.axis([xlims[0], xlims[1], ylims[0], ylims[1]])
     plt.legend()
     plt.title(f"Future Predictions for t={t:.3f}s")
 
@@ -265,12 +326,27 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
                     problematic.append(p)
                 else:
                     not_problematic.append(p)
-            problematic_particle_plots[i].set_xdata([p.item(0) for p in problematic])
-            problematic_particle_plots[i].set_ydata([p.item(1) for p in problematic])
+            x = [p.item(0) for p in problematic]
+            y = [p.item(1) for p in problematic]
+            problematic_particle_plots[i].set_xdata(x)
+            problematic_particle_plots[i].set_ydata(y)
             not_problematic_particle_plots[i].set_xdata([p.item(0) for p in not_problematic])
             not_problematic_particle_plots[i].set_ydata([p.item(1) for p in not_problematic])
+            if contours[i] is not None:
+                for coll in contours[i].collections:
+                    coll.remove()
+                contours[i] = None
             if len(problematic) > 1:
                 centroid, a, b, alpha = get_ellipse_for_printing(problematic)
+                x = np.array(x)
+                y = np.array(y)
+                k = gaussian_kde(np.array([x,y]))
+                nbins = 100
+
+                xi, yi = np.mgrid[x.min():x.max():nbins*1j, y.min():y.max():nbins*1j]
+                zi = k(np.vstack([xi.flatten(), yi.flatten()]))
+
+                contours[i] = ax.contour(xi, yi, zi.reshape(xi.shape))
             else:
                  centroid, a, b, alpha = (0,0),5.,5.,0.
             p_ellipses[i].set_center(centroid)
