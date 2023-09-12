@@ -101,6 +101,9 @@ class Trajectories:
     def set_particle_positions(self, pposes):
         for i in range(self.num_intruders):
             self.poss[self.num_intruders+1+i*self.num_particles:self.num_intruders+1+(i+1)*self.num_particles] = pposes[i]
+    
+    def set_own_position(self, ownp):
+        self.poss[0] = ownp
 
 class Plotter:
     def __init__(self, num_intruders, num_particles, limits) -> None:
@@ -230,19 +233,20 @@ def calculate_problematic_and_pdfs(t, ts, filters, po, vo, vo_max):
             y = []
             pos = filters[j].get_future_positions(dt)
             for p in pos:
-                if la.norm(p-po-vo*t)/(dt+0.0001)<=vo_max:
-                    problematic[j][i].append(p)
-                    x.append(p.item(0))
-                    y.append(p.item(1))
-                else:
-                    not_problematic[j][i].append(p)
-            if len(problematic[j][i]) <= 2:
-                kdes[j].append(None)
-            else:
-                x = np.array(x)
-                y = np.array(y)
-                k = gaussian_kde(np.array([x,y]))
-                kdes[j].append(k)
+                # if la.norm(p-po-vo*t)/(dt+0.0001)<=vo_max:
+                problematic[j][i].append(p)
+                    
+                # else:
+                #     not_problematic[j][i].append(p)
+                x.append(p.item(0))
+                y.append(p.item(1))
+            # if len(problematic[j][i]) <= 2:
+            #     kdes[j].append(None)
+            # else:
+            x = np.array(x)
+            y = np.array(y)
+            k = gaussian_kde(np.array([x,y]))
+            kdes[j].append(k)
     return kdes, problematic, not_problematic
 
             
@@ -270,24 +274,25 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
         x = [p.item(0) for p in problematic[i][j]]
         y = [p.item(1) for p in problematic[i][j]]
         l,=plt.plot(x, y,marker='.', ls='', markersize=1, label=f'P Particles Intruder {i+1}')
+
         nl,=plt.plot([p.item(0) for p in not_problematic[i][j]], [p.item(1) for p in not_problematic[i][j]],marker='.', ls='', markersize=1, label=f'Not P Particles Intruder {i+1}')
         if contours[i] is not None:
             for coll in contours[i].collections:
                 coll.remove()
             contours[i] = None
-        if len(problematic[i][j]) > 1 and kdes[i][j] is not None:
-            centroid, a, b, alpha = get_ellipse_for_printing(problematic[i][j])
-            x = np.array(x)
-            y = np.array(y)
-            k = kdes[i][j]
-            nbins = 100
+        # if len(problematic[i][j]) > 1 and kdes[i][j] is not None:
+            # centroid, a, b, alpha = get_ellipse_for_printing(problematic[i][j])
+        x = np.array(x)
+        y = np.array(y)
+        k = kdes[i][j]
+        nbins = 100
 
-            xi, yi = np.mgrid[x.min():x.max():nbins*1j, y.min():y.max():nbins*1j]
-            zi = k(np.vstack([xi.flatten(), yi.flatten()]))
+        xi, yi = np.mgrid[x.min():x.max():nbins*1j, y.min():y.max():nbins*1j]
+        zi = k(np.vstack([xi.flatten(), yi.flatten()]))
 
-            contours[i] = ax.contour(xi, yi, zi.reshape(xi.shape))
-        else:
-            centroid, a, b, alpha = (0,-100),5.,5.,0.
+        contours[i] = ax.contour(xi, yi, zi.reshape(xi.shape))
+        # else:
+        centroid, a, b, alpha = (0,-100),5.,5.,0.
             
         ellipse = Ellipse(centroid, a, b, alpha, edgecolor='k', fc='None',lw=2)
         ax_gca.add_artist(ellipse)
@@ -326,19 +331,19 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
                 for coll in contours[i].collections:
                     coll.remove()
                 contours[i] = None
-            if len(problematic[i][j]) > 1 and kdes[i][j] is not None:
-                centroid, a, b, alpha = get_ellipse_for_printing(problematic[i][j])
-                x = np.array(x)
-                y = np.array(y)
-                k = kdes[i][j]
-                nbins = 100
+            # if len(problematic[i][j]) > 1 and kdes[i][j] is not None:
+                # centroid, a, b, alpha = get_ellipse_for_printing(problematic[i][j])
+            x = np.array(x)
+            y = np.array(y)
+            k = kdes[i][j]
+            nbins = 100
 
-                xi, yi = np.mgrid[x.min():x.max():nbins*1j, y.min():y.max():nbins*1j]
-                zi = k(np.vstack([xi.flatten(), yi.flatten()]))
+            xi, yi = np.mgrid[x.min():x.max():nbins*1j, y.min():y.max():nbins*1j]
+            zi = k(np.vstack([xi.flatten(), yi.flatten()]))
 
-                contours[i] = ax.contour(xi, yi, zi.reshape(xi.shape))
-            else:
-                 centroid, a, b, alpha = (0,-100),5.,5.,0.
+            contours[i] = ax.contour(xi, yi, zi.reshape(xi.shape))
+            # else:
+            centroid, a, b, alpha = (0,-100),5.,5.,0.
             p_ellipses[i].set_center(centroid)
             p_ellipses[i].set_width(a)
             p_ellipses[i].set_height(b)
@@ -357,6 +362,7 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
 
     plt.show()
     plt.ion()
+    return np.array([[cps[1][0], cps[1][1]]]).T
 
 def get_ellipse_for_printing(points):
     center = np.mean(np.asarray(points), axis=0)
@@ -424,8 +430,10 @@ while t < tstop:
             filters[i].update(lm, traj.get_own_position(), tau)
     if steps >= 1:
         plotter.update_plot(traj.get_own_position(), traj.get_intruder_positions(), [filter.get_particle_positions() for filter in filters])
-        plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, [-200, 200], [0, 200])
+        nextpoint = plot_futures(t, ts, filters, actual_pis, actual_vis, traj.get_own_position(), vo, [-200, 200], [0, 200])
     traj.update()
+    # if steps >= 1:
+    #     traj.set_own_position(nextpoint)
     t+=ts
     steps += 1
     # time.sleep(ts)

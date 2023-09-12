@@ -13,11 +13,11 @@ class PathPlanner:
         self.ts = ts
         self.goal_pos = goal_pos
         self.old_path = np.zeros(self.num_control_points*2)
-        self.probability_threshold = 0.0001
+        self.probability_threshold = 0.00007
         pass
 
     def update(self, own_pos, intruder_pdfs) -> BSpline.Curve: # expect a nested list of intruder pdfs for each timestep into the future
-        start_point=(0,0) # TODO: change to incorporate new initial position
+        start_point=(own_pos.item(0),own_pos.item(1)) # TODO: change to incorporate new initial position
 
         # setup the intruder avoidance constraint
         def calc_probability_collision(x):
@@ -27,7 +27,7 @@ class PathPlanner:
                 out = 0
                 for j in range(len(intruder_pdfs)):
                     if intruder_pdfs[j][i//2] is not None:
-                        out += intruder_pdfs[j][i//2]([x[i],x[i+1]])
+                        out += intruder_pdfs[j][i//2]([x[i],x[i+1]]).item(0)
                 tmp.append(out)
             return tmp
         avoidance_constraint = NonlinearConstraint(calc_probability_collision, 0.0, self.probability_threshold)
@@ -45,7 +45,9 @@ class PathPlanner:
         def objective_function(x):
             res = math.dist((x[-2],x[-1]), self.goal_pos)
             return res
-        initial_x = self.old_path # TODO: transition from old path to current guess better (skip first point, add another endpoint)
+        initial_x = np.zeros_like(self.old_path)
+        initial_x[0:-2] = self.old_path[2:]
+        initial_x[-2:] = self.old_path[-2:]
         bounds = [(-10000,100) for i in range(len(initial_x))]
         res = minimize(objective_function, initial_x, method='SLSQP', constraints=[max_velocity_constraint, avoidance_constraint])
         cp = [[start_point[0], start_point[1]]]
