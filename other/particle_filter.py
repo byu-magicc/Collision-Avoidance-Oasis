@@ -121,29 +121,32 @@ class Particle_Filter:
 
         # solve the min-norm problem
         A=[]
+        extra = 0 if tau is None else 1
         for i in range(len(ls)):
             Ap = []
             for j in range(i):
                 Ap.append(np.zeros((2,1)))
             Ap.append(ls[i])
-            for j in range(i+1,len(ls)+1):
+            for j in range(i+1,len(ls)+extra):
                 Ap.append(np.zeros((2,1)))
             Ap.append(-np.eye(2)*self.ts*(i+1))
             A1 = np.concatenate(Ap,axis=1)
             A.append(A1)
         A2 = []
-        for i in range(len(ls)):
-            A2.append(np.zeros((2,1)))
-        A2.append(ecp)
-        A2.append(-np.eye(2)*tau)
-        A2 = np.concatenate(A2, axis=1)
-        A.append(A2)
+        if tau is not None:
+            for i in range(len(ls)):
+                A2.append(np.zeros((2,1)))
+            A2.append(ecp)
+            A2.append(-np.eye(2)*tau)
+            A2 = np.concatenate(A2, axis=1)
+            A.append(A2)
         A = np.concatenate(A,axis=0)
 
         b = []
         for i in range(len(ls)):
             b.append(po0-pos[i]+a1*l1)
-        b.append(-vo*tau+a1*l1)
+        if tau is not None:
+            b.append(-vo*tau+a1*l1)
         b = np.concatenate(b,axis=0)
 
         x = np.linalg.pinv(A)@b
@@ -169,7 +172,7 @@ class Particle_Filter:
         self.weights = [x/sum for x in self.weights]
         self.lms.append(deepcopy(lm))
         self.t += self.ts
-        self.taus.append(tau + self.t)
+        # self.taus.append(tau + self.t)
 
         # resample
         old_pi0s = deepcopy(self.pi0s)
@@ -199,7 +202,7 @@ class Particle_Filter:
             l[0,0] += np.random.normal(0,0.001)
             l /= np.linalg.norm(l)
             vi = np.array([[1., 1.]]).T
-            pi0, vi = self.calculate_trajectory_first(a0, [l]+self.lms[1:],self.ec, np.average(self.taus), self.pos) # use this to get an initial guess of the position and velocity
+            pi0, vi = self.calculate_trajectory_first(a0, [l]+self.lms[1:],self.ec, None, self.pos) # use this to get an initial guess of the position and velocity
             # pk, vk, pi0n = self.calculate_velocity_improved(self.lms, pi0, vi, self.pos)
             pk, vk, pi0n = (pi0+vi*self.t, vi, pi0)
             self.particle_p[mm] = pk

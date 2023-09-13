@@ -245,8 +245,8 @@ def calculate_problematic_and_pdfs(t, ts, filters, po, vo, vo_max):
             # else:
             x = np.array(x)
             y = np.array(y)
-            k = gaussian_kde(np.array([x,y]))
-            kdes[j].append(k)
+            # k = gaussian_kde(np.array([x,y]))
+            # kdes[j].append(k)
     return kdes, problematic, not_problematic
 
             
@@ -266,7 +266,7 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
     contours = [None]*len(filters)
 
     kdes, problematic, not_problematic = calculate_problematic_and_pdfs(t, ts, filters, po, vo, vo_max) #TODO: Finish incorperating this into the plotter
-    path, cps = planner.update(po, kdes)
+    # path, cps = planner.update(po, kdes)
     tf = t
     j = int((tf - t)/ts)
 
@@ -284,13 +284,13 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
             # centroid, a, b, alpha = get_ellipse_for_printing(problematic[i][j])
         x = np.array(x)
         y = np.array(y)
-        k = kdes[i][j]
+        # k = kdes[i][j]
         nbins = 100
 
-        xi, yi = np.mgrid[x.min():x.max():nbins*1j, y.min():y.max():nbins*1j]
-        zi = k(np.vstack([xi.flatten(), yi.flatten()]))
+        # xi, yi = np.mgrid[x.min():x.max():nbins*1j, y.min():y.max():nbins*1j]
+        # zi = k(np.vstack([xi.flatten(), yi.flatten()]))
 
-        contours[i] = ax.contour(xi, yi, zi.reshape(xi.shape))
+        # contours[i] = ax.contour(xi, yi, zi.reshape(xi.shape))
         # else:
         centroid, a, b, alpha = (0,-100),5.,5.,0.
             
@@ -304,9 +304,9 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
         li, = plt.plot(p.item(0), p.item(1), marker='.', ls='', markersize=10, label=f'Intruder {i+1}')
         intruder_plots.append(li)
     p = po+vo*(t+initial_dt)
-    l0, = plt.plot(cps[j][0], cps[j][1], c='r', marker='.', ls='', markersize=10, label='Ownship')
-    curvepts = np.array(path.evalpts)
-    curveplt, = plt.plot(curvepts[:,0], curvepts[:,1], color='yellowgreen', linestyle='-')
+    # l0, = plt.plot(cps[j][0], cps[j][1], c='r', marker='.', ls='', markersize=10, label='Ownship')
+    # curvepts = np.array(path.evalpts)
+    # curveplt, = plt.plot(curvepts[:,0], curvepts[:,1], color='yellowgreen', linestyle='-')
     ax_gca = plt.axis([xlims[0], xlims[1], ylims[0], ylims[1]])
     plt.legend()
     plt.title(f"Future Predictions for t={t:.3f}s")
@@ -335,13 +335,13 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
                 # centroid, a, b, alpha = get_ellipse_for_printing(problematic[i][j])
             x = np.array(x)
             y = np.array(y)
-            k = kdes[i][j]
+            # k = kdes[i][j]
             nbins = 100
 
-            xi, yi = np.mgrid[x.min():x.max():nbins*1j, y.min():y.max():nbins*1j]
-            zi = k(np.vstack([xi.flatten(), yi.flatten()]))
+            # xi, yi = np.mgrid[x.min():x.max():nbins*1j, y.min():y.max():nbins*1j]
+            # zi = k(np.vstack([xi.flatten(), yi.flatten()]))
 
-            contours[i] = ax.contour(xi, yi, zi.reshape(xi.shape))
+            # contours[i] = ax.contour(xi, yi, zi.reshape(xi.shape))
             # else:
             centroid, a, b, alpha = (0,-100),5.,5.,0.
             p_ellipses[i].set_center(centroid)
@@ -352,8 +352,8 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
             intruder_plots[i].set_xdata(p.item(0))
             intruder_plots[i].set_ydata(p.item(1))
         p = po+vo*(tf)
-        l0.set_xdata(cps[j][0])
-        l0.set_ydata(cps[j][1])
+        # l0.set_xdata(cps[j][0])
+        # l0.set_ydata(cps[j][1])
         # redraw canvas while idle
         fig.canvas.draw()
 
@@ -362,7 +362,7 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
 
     plt.show()
     plt.ion()
-    return np.array([[cps[1][0], cps[1][1]]]).T
+    # return np.array([[cps[1][0], cps[1][1]]]).T
 
 def get_ellipse_for_printing(points):
     center = np.mean(np.asarray(points), axis=0)
@@ -427,13 +427,14 @@ while t < tstop:
             filters.append(Particle_Filter(num_particles, lm_col[i][0], lm_col[i][1], tau, po, po+vo*ts, ec, r_min, r_max, v_max, ts))
         if steps >= 2:
             # weight the particles based on the new bearing measurement
-            filters[i].update(lm, traj.get_own_position(), tau)
+            filters[i].update(lm, traj.get_own_position(), None)
     if steps >= 1:
         plotter.update_plot(traj.get_own_position(), traj.get_intruder_positions(), [filter.get_particle_positions() for filter in filters])
         nextpoint = plot_futures(t, ts, filters, actual_pis, actual_vis, traj.get_own_position(), vo, [-200, 200], [0, 200])
     traj.update()
-    # if steps >= 1:
-    #     traj.set_own_position(nextpoint)
+    if steps >= 1:
+        nextpoint = traj.get_own_position() + np.array([[0.,5.]]).T
+        traj.set_own_position(nextpoint)
     t+=ts
     steps += 1
     # time.sleep(ts)

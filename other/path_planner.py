@@ -39,7 +39,7 @@ class PathPlanner:
             for i in range(0, len(x)-2, 2):
                 con.append(math.dist((x[i],x[i+1]),(x[i+2],x[i+3])))
             return con
-        max_velocity_constraint = NonlinearConstraint(calc_dx, 0., self.timestep_max_dist)
+        max_velocity_constraint = NonlinearConstraint(calc_dx, 0., self.timestep_max_dist, keep_feasible=True)
 
         # drive us toward the objective function
         def objective_function(x):
