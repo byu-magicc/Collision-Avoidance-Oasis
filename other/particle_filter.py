@@ -157,7 +157,7 @@ class Particle_Filter:
         vi = x[-2:]
         return pi0, vi
     
-    def update(self, lm, po, tau):
+    def update(self, lm, po, tau, accelerating=False):
         # update the weights
         self.pos.append(deepcopy(po))
         for i in range(self.num_particles):
@@ -172,11 +172,13 @@ class Particle_Filter:
         self.weights = [x/sum for x in self.weights]
         self.lms.append(deepcopy(lm))
         self.t += self.ts
-        # self.taus.append(tau + self.t)
+        self.taus.append(tau + self.t)
 
         # resample
         old_pi0s = deepcopy(self.pi0s)
         # old_ps = deepcopy(self.particle_p)
+
+        # TODO: change up resampling if we start accelerating, we can't use the old algorithm
 
         rr = np.random.rand()/self.num_particles
         i = 0
@@ -202,7 +204,7 @@ class Particle_Filter:
             l[0,0] += np.random.normal(0,0.001)
             l /= np.linalg.norm(l)
             vi = np.array([[1., 1.]]).T
-            pi0, vi = self.calculate_trajectory_first(a0, [l]+self.lms[1:],self.ec, None, self.pos) # use this to get an initial guess of the position and velocity
+            pi0, vi = self.calculate_trajectory_first(a0, [l]+self.lms[1:],self.ec, np.average(self.taus), self.pos) # use this to get an initial guess of the position and velocity
             # pk, vk, pi0n = self.calculate_velocity_improved(self.lms, pi0, vi, self.pos)
             pk, vk, pi0n = (pi0+vi*self.t, vi, pi0)
             self.particle_p[mm] = pk
