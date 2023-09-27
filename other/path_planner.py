@@ -17,7 +17,7 @@ class PathPlanner:
         pass
 
     def update(self, own_pos, intruder_pdfs) -> BSpline.Curve: # expect a nested list of intruder pdfs for each timestep into the future
-        start_point=(own_pos.item(0),own_pos.item(1)) # TODO: change to incorporate new initial position
+        start_point=(own_pos.item(0),own_pos.item(1)) 
 
         # setup the intruder avoidance constraint
         def calc_probability_collision(x):
@@ -39,7 +39,7 @@ class PathPlanner:
             for i in range(0, len(x)-2, 2):
                 con.append(math.dist((x[i],x[i+1]),(x[i+2],x[i+3])))
             return con
-        max_velocity_constraint = NonlinearConstraint(calc_dx, 0., self.timestep_max_dist, keep_feasible=True)
+        max_velocity_constraint = NonlinearConstraint(calc_dx, 0., self.timestep_max_dist)
 
         # drive us toward the objective function
         def objective_function(x):

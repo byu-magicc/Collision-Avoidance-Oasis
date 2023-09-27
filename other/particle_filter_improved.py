@@ -23,7 +23,7 @@ po=np.array([[0.,0.]]).T
 vo=np.array([[0.,20.]]).T
 
 # generate an example trajectory to calculate LOS vectors and TTC
-actual_pis=[np.array([[-30.,100.]]).T, np.array([[30., 50.]]).T]
+actual_pis=[np.array([[-100.,100.]]).T, np.array([[30., 50.]]).T]
 actual_vis=[np.array([[20.,0.]]).T, np.array([[-20., 0.]]).T]
 
 ec=vo/np.linalg.norm(vo)
@@ -148,17 +148,17 @@ class Plotter:
 
         # plot each of the actual intruders
         for i in range(self.num_intruders):
-            lines=self.ax.plot(self.pix[i],self.piy[i],label=f"Intruder {i+1}")
+            lines=self.ax.plot(self.pix[i],self.piy[i], marker='.', markersize=10,label=f"Intruder {i+1}")
             if len(self.pix[i]) >= 2:
                 self.ax.arrow(self.pix[i][0], self.piy[i][0], self.pix[i][1]-self.pix[i][0], self.piy[i][1]-self.piy[i][0], head_width=head_width, color=lines[0].get_color())
             
 
         # plot the own-ship path
-        self.ax.plot(self.pox,self.poy,label='Own',c='r')
+        self.ax.plot(self.pox,self.poy, marker='.', markersize=10,label='Own',c='r')
         if len(self.pox)>=2:
             self.ax.arrow(self.pox[0], self.poy[0], self.pox[1]-self.pox[0], self.poy[1]-self.poy[0], color='r', head_width=head_width)
 
-        self.ax.set_title("Positions of Own-ship and Intruders")
+        self.ax.set_title("Particles Produced By Intruders")
         self.ax.set_xlabel("x (m)")
         self.ax.set_ylabel("y (m)")
         self.ax.legend()
@@ -265,17 +265,18 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
     ax_gca = plt.gca()
     contours = [None]*len(filters)
 
-    kdes, problematic, not_problematic = calculate_problematic_and_pdfs(t, ts, filters, po, vo, vo_max) #TODO: Finish incorperating this into the plotter
-    # path, cps = planner.update(po, kdes)
+    kdes, problematic, not_problematic = calculate_problematic_and_pdfs(t, ts, filters, po, vo, vo_max)
+    if t > 1:
+        path, cps = planner.update(po, kdes)
     tf = t
     j = int((tf - t)/ts)
 
     for i in range(len(filters)):
         x = [p.item(0) for p in problematic[i][j]]
         y = [p.item(1) for p in problematic[i][j]]
-        l,=plt.plot(x, y,marker='.', ls='', markersize=1, label=f'P Particles Intruder {i+1}')
+        l,=plt.plot(x, y,marker='.', ls='', markersize=1, label=f'Intruder {i+1} Particles')
 
-        nl,=plt.plot([p.item(0) for p in not_problematic[i][j]], [p.item(1) for p in not_problematic[i][j]],marker='.', ls='', markersize=1, label=f'Not P Particles Intruder {i+1}')
+        # nl,=plt.plot([p.item(0) for p in not_problematic[i][j]], [p.item(1) for p in not_problematic[i][j]],marker='.', ls='', markersize=1, label=f'Not P Particles Intruder {i+1}')
         if contours[i] is not None:
             for coll in contours[i].collections:
                 coll.remove()
@@ -298,17 +299,22 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
         ax_gca.add_artist(ellipse)
         p_ellipses.append(ellipse)
         problematic_particle_plots.append(l)
-        not_problematic_particle_plots.append(nl)
+        # not_problematic_particle_plots.append(nl)
     for i in range(len(actual_pis)):
         p = actual_pis[i]+actual_vis[i]*(t+initial_dt)
         li, = plt.plot(p.item(0), p.item(1), marker='.', ls='', markersize=10, label=f'Intruder {i+1}')
         intruder_plots.append(li)
     p = po+vo*(initial_dt)
-    l0, = plt.plot(p.item(0), p.item(1), c='r', marker='.', ls='', markersize=10, label='Ownship')
-    # l0, = plt.plot(cps[j][0], cps[j][1], c='r', marker='.', ls='', markersize=10, label='Ownship')
-    # curvepts = np.array(path.evalpts)
-    # curveplt, = plt.plot(curvepts[:,0], curvepts[:,1], color='yellowgreen', linestyle='-')
+    if t <= 1:
+        l0, = plt.plot(p.item(0), p.item(1), c='r', marker='.', ls='', markersize=10, label='Ownship')
+    else:
+        l0, = plt.plot(cps[j][0], cps[j][1], c='r', marker='.', ls='', markersize=10, label='Ownship')
+        curvepts = np.array(path.evalpts)
+        curveplt, = plt.plot(curvepts[:,0], curvepts[:,1], color='yellowgreen', linestyle='-')
     ax_gca = plt.axis([xlims[0], xlims[1], ylims[0], ylims[1]])
+    plt.xlabel("x (m)")
+    plt.ylabel("y (m)")
+    plt.subplots_adjust(bottom=0.15)
     plt.legend()
     plt.title(f"Future Predictions for t={t:.3f}s")
 
@@ -326,8 +332,8 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
             y = [p.item(1) for p in problematic[i][j]]
             problematic_particle_plots[i].set_xdata(x)
             problematic_particle_plots[i].set_ydata(y)
-            not_problematic_particle_plots[i].set_xdata([p.item(0) for p in not_problematic[i][j]])
-            not_problematic_particle_plots[i].set_ydata([p.item(1) for p in not_problematic[i][j]])
+            # not_problematic_particle_plots[i].set_xdata([p.item(0) for p in not_problematic[i][j]])
+            # not_problematic_particle_plots[i].set_ydata([p.item(1) for p in not_problematic[i][j]])
             if contours[i] is not None:
                 for coll in contours[i].collections:
                     coll.remove()
@@ -352,11 +358,14 @@ def plot_futures(t, ts, filters, actual_pis, actual_vis, po, vo, xlims, ylims):
             p = actual_pis[i]+actual_vis[i]*(tf)
             intruder_plots[i].set_xdata(p.item(0))
             intruder_plots[i].set_ydata(p.item(1))
-        p = po+vo*(j*ts)
-        l0.set_xdata(p.item(0))
-        l0.set_ydata(p.item(1))
-        # l0.set_xdata(cps[j][0])
-        # l0.set_ydata(cps[j][1])
+        
+        if t <= 1:
+            p = po+vo*(j*ts)
+            l0.set_xdata(p.item(0))
+            l0.set_ydata(p.item(1))
+        else:
+            l0.set_xdata(cps[j][0])
+            l0.set_ydata(cps[j][1])
         # redraw canvas while idle
         fig.canvas.draw()
 
