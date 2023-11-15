@@ -28,51 +28,6 @@ actual_vis=[np.array([[20.,0.]]).T, np.array([[-20., 0.]]).T]
 
 ec=vo/np.linalg.norm(vo)
 
-# def calculate_trajectory_last(at, ls, t_s, ec, tau):
-#     if len(ls)<2:
-#         raise
-#     lt = ls[-1]
-#     ls = ls[0:-1]
-#     t = t_s[-1]
-#     t_s = t_s[0:-1]
-#     # get the unit vector perpendicular to the camera normal vector
-#     ecp = np.array([[0, -1],[1,0]]) @ ec
-
-#     # solve the min-norm problem
-#     A=[]
-#     for i in range(len(ls)):
-#         Ap = []
-#         for j in range(i):
-#             Ap.append(np.zeros((2,1)))
-#         Ap.append(ls[i])
-#         for j in range(i+1,len(ls)+1):
-#             Ap.append(np.zeros((2,1)))
-#         Ap.append(np.eye(2)*(t-t_s[i]))
-#         A1 = np.concatenate(Ap,axis=1)
-#         A.append(A1)
-#     A2 = []
-#     for i in range(len(ls)):
-#         A2.append(np.zeros((2,1)))
-#     A2.append(ecp)
-#     A2.append(np.eye(2)*(t-tau))
-#     A2 = np.concatenate(A2, axis=1)
-#     A.append(A2)
-#     A = np.concatenate(A,axis=0)
-
-#     b = []
-#     for i in range(len(ls)):
-#         b.append(at*lt+vo*(t-t_s[i]))
-#     b.append(at*lt+vo*(t-tau))
-#     b = np.concatenate(b,axis=0)
-
-#     x = np.linalg.pinv(A)@b
-
-#     # set the result up as a possible trajectory to plot along 
-#     # with the original example
-#     pit = at*lt
-#     vi = x[-2:]
-#     return pit, vi
-
 
 class Trajectories:
     def __init__(self, num_intruders, num_particles, initial_pos, velocities, ts) -> None:
